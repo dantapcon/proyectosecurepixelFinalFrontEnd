@@ -23,15 +23,25 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const defaultOptions: RequestInit = {
     headers: {
       'Content-Type': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
+      ...(token && { 'Authorization': `Token ${token}` }),
       ...options.headers,
     },
     ...options,
   }
 
   try {
+    console.log('Making request to:', endpoint, 'with options:', defaultOptions)
     const response = await fetch(endpoint, defaultOptions)
-    const data = await response.json()
+    
+    let data;
+    try {
+      data = await response.json()
+    } catch (e) {
+      // Si no es JSON válido, usar el texto de respuesta
+      data = { message: await response.text() }
+    }
+    
+    console.log('Response status:', response.status, 'Data:', data)
     
     return {
       ok: response.ok,
@@ -39,6 +49,7 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
       data,
     }
   } catch (error) {
+    console.error('Request error:', error)
     return {
       ok: false,
       status: 0,
@@ -71,9 +82,20 @@ export const userAPI = {
   },
 
   logout: async () => {
-    return apiRequest(API_ENDPOINTS.LOGOUT, {
+    const token = localStorage.getItem('token')
+    console.log('Attempting logout with token:', token ? 'Token found' : 'No token found')
+    
+    // Intentar con diferentes formatos de autenticación
+    const response = await apiRequest(API_ENDPOINTS.LOGOUT, {
       method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      }
     })
+    
+    console.log('Logout response:', response)
+    return response
   },
 
   getCurrentUser: async () => {

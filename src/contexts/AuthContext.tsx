@@ -91,10 +91,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     try {
-      await userAPI.logout()
+      console.log('Starting logout process...')
+      const response = await userAPI.logout()
+      
+      if (!response.ok) {
+        console.error('Logout failed:', response.data)
+        // Continuar con el logout local incluso si falla el logout del servidor
+      } else {
+        console.log('Logout successful')
+      }
     } catch (error) {
+      console.error('Logout error:', error)
       // Continuar con el logout local incluso si falla el logout del servidor
     } finally {
+      console.log('Cleaning up local session...')
       setUser(null)
       localStorage.removeItem('token')
       localStorage.removeItem('user')

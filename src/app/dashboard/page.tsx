@@ -1,13 +1,31 @@
 "use client"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { Shield, BookOpen, Brain, Camera, TrendingUp, Clock, Award, Target, User, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function DashboardPage() {
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error durante el logout:', error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       {/* Header */}
@@ -26,9 +44,14 @@ export default function DashboardPage() {
               <Settings className="h-4 w-4 mr-2" />
               Configuración
             </Button>
-            <Button variant="outline" size="sm">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
               <LogOut className="h-4 w-4 mr-2" />
-              Salir
+              {isLoggingOut ? 'Saliendo...' : 'Salir'}
             </Button>
           </div>
         </div>

@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Shield,
   Users,
   BarChart3,
   AlertTriangle,
@@ -21,6 +20,7 @@ import {
   Clock,
   Award,
 } from "lucide-react"
+import DashboardHeader from "@/components/DashboardHeader"
 
 export default function TeacherDashboard() {
   const [selectedClass, setSelectedClass] = useState("all")
@@ -109,12 +109,11 @@ export default function TeacherDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       {/* Header */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">SecurePixel Docente</span>
-          </div>
+      <DashboardHeader title="SecurePixel Docente" userRole="teacher" />
+
+      {/* Class Selector */}
+      <div className="bg-white border-b">
+        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Select value={selectedClass} onValueChange={setSelectedClass}>
               <SelectTrigger className="w-48">
@@ -126,10 +125,9 @@ export default function TeacherDashboard() {
                 <SelectItem value="cs201">Ciberseguridad Avanzada</SelectItem>
               </SelectContent>
             </Select>
-            <Badge className="bg-blue-100 text-blue-800">Prof. Ana Rodríguez</Badge>
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="container mx-auto px-4 py-8">
         {/* Overview */}

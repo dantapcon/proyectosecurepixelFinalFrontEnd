@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
-  Shield,
   Users,
   BarChart3,
   Settings,
@@ -24,6 +23,7 @@ import {
   Activity,
 } from "lucide-react"
 import Link from "next/link"
+import DashboardHeader from "@/components/DashboardHeader"
 
 export default function AdminDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("7d")
@@ -57,23 +57,7 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       {/* Header */}
-      <header className="bg-white border-b shadow-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Shield className="h-8 w-8 text-blue-600" />
-            <span className="text-2xl font-bold text-gray-900">SecurePixel Admin</span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Badge className="bg-green-100 text-green-800">Sistema Operativo</Badge>
-            <Button variant="outline" size="sm" asChild>
-              <Link href="/admin/settings">
-                <Settings className="h-4 w-4 mr-2" />
-                Configuración
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </header>
+      <DashboardHeader title="SecurePixel Admin" userRole="admin" showSystemStatus={true} />
 
       <div className="container mx-auto px-4 py-8">
         {/* System Overview */}
