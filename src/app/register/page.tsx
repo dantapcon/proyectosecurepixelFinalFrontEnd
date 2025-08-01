@@ -1,15 +1,87 @@
 "use client"
 
 import Link from "next/link"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield } from "lucide-react"
+import { userAPI } from "@/lib/api"
 
 export default function RegisterPage() {
+  const [formData, setFormData] = useState({
+    fullName: '',
+    lastName: '',
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const router = useRouter()
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormData(prev => {
+      const newData = {
+        ...prev,
+        [id]: value
+      }
+      
+      // Si se está cambiando el email, actualizar automáticamente el username
+      if (id === 'email') {
+        newData.username = value
+      }
+      
+      return newData
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    
+    // Validaciones básicas
+    if (formData.password !== formData.confirmPassword) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
+    
+    if (formData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres')
+      return
+    }
+
+    setIsLoading(true)
+
+    try {
+      const response = await userAPI.register({
+        first_name: formData.fullName,
+        last_name: formData.lastName,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+        password_confirm: formData.confirmPassword
+      })
+
+      if (response.ok) {
+        // Registro exitoso
+        router.push('/login?message=Registro exitoso. Ahora puedes iniciar sesión.')
+      } else {
+        // Error del servidor
+        setError(response.data.message || 'Error al registrar usuario')
+      }
+    } catch (error) {
+      setError('Error de conexión. Verifica que el servidor esté funcionando.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4 pb-16 relative">
       {/* Header */}
       <div className="absolute top-4 left-4">
         <Link href="/" className="flex items-center space-x-2">
@@ -32,6 +104,12 @@ export default function RegisterPage() {
           <p className="text-gray-600 mt-2">Únete a nuestra plataforma de aprendizaje de ciberseguridad</p>
         </CardHeader>
         <CardContent className="space-y-6">
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+
           <Button variant="outline" className="w-full border-gray-300 hover:bg-gray-50 py-3 bg-transparent">
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path
@@ -63,7 +141,7 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <Label htmlFor="fullName" className="text-gray-700">
                 Nombre Completo
@@ -72,8 +150,41 @@ export default function RegisterPage() {
                 id="fullName"
                 type="text"
                 placeholder="Tu nombre completo"
+                value={formData.fullName}
+                onChange={handleInputChange}
+                required
                 className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
+            </div>
+            <div>
+              <Label htmlFor="lastName" className="text-gray-700">
+                Apellido
+              </Label>
+              <Input
+                id="lastName"
+                type="text"
+                placeholder="Tu apellido"
+                value={formData.lastName}
+                onChange={handleInputChange}
+                required
+                className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <Label htmlFor="username" className="text-gray-700">
+                Nombre de Usuario
+              </Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Se generará automáticamente desde tu email"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
+                disabled
+                className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500 bg-gray-50 text-gray-500"
+              />
+              <p className="text-xs text-gray-500 mt-1">Se asignará automáticamente cuando ingreses tu email</p>
             </div>
             <div>
               <Label htmlFor="email" className="text-gray-700">
@@ -83,6 +194,9 @@ export default function RegisterPage() {
                 id="email"
                 type="email"
                 placeholder="ejemplo@correo.com"
+                value={formData.email}
+                onChange={handleInputChange}
+                required
                 className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -94,6 +208,10 @@ export default function RegisterPage() {
                 id="password"
                 type="password"
                 placeholder="Crea una contraseña segura"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
+                minLength={8}
                 className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -105,12 +223,21 @@ export default function RegisterPage() {
                 id="confirmPassword"
                 type="password"
                 placeholder="Repite tu contraseña"
+                value={formData.confirmPassword}
+                onChange={handleInputChange}
+                required
                 className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 py-3">Crear Cuenta</Button>
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 py-3 disabled:opacity-50"
+            >
+              {isLoading ? 'Creando cuenta...' : 'Crear Cuenta'}
+            </Button>
+          </form>
 
           <p className="text-center text-gray-600 text-sm">
             ¿Ya tienes una cuenta?{" "}
@@ -121,7 +248,7 @@ export default function RegisterPage() {
         </CardContent>
       </Card>
 
-      <footer className="absolute bottom-4 text-center text-gray-500 text-sm">
+      <footer className="absolute bottom-4 left-0 right-0 text-center text-gray-500 text-sm px-4">
         © 2023 SecurePixel - Sistema de Aprendizaje Inteligente de Ciberseguridad
       </footer>
     </div>

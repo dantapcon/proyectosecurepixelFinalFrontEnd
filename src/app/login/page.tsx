@@ -1,13 +1,68 @@
 "use client"
 
 import Link from "next/link"
+import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield } from "lucide-react"
+import { userAPI } from "@/lib/api"
 
 export default function LoginPage() {
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  })
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    // Mostrar mensaje de éxito si viene del registro
+    const message = searchParams.get('message')
+    if (message) {
+      setSuccessMessage(message)
+    }
+  }, [searchParams])
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { id, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [id]: value
+    }))
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const response = await userAPI.login({
+        username: formData.username,
+        password: formData.password
+      })
+
+      if (response.ok) {
+        // Login exitoso - redirigir al dashboard
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        localStorage.setItem('token', response.data.token)
+        router.push('/dashboard')
+      } else {
+        // Error del servidor
+        setError(response.data.message || 'Credenciales incorrectas')
+      }
+    } catch (error) {
+      setError('Error de conexión. Verifica que el servidor esté funcionando.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
       {/* Header */}
@@ -32,6 +87,18 @@ export default function LoginPage() {
           <p className="text-gray-600 mt-2">Accede a tu cuenta para continuar tu aprendizaje en ciberseguridad</p>
         </CardHeader>
         <CardContent className="space-y-6">
+          {successMessage && (
+            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
+              {successMessage}
+            </div>
+          )}
+          
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+
           <Button variant="outline" className="w-full border-gray-300 hover:bg-gray-50 py-3 bg-transparent">
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path
@@ -63,15 +130,18 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <Label htmlFor="email" className="text-gray-700">
-                Correo Electrónico
+              <Label htmlFor="username" className="text-gray-700">
+                Nombre de Usuario
               </Label>
               <Input
-                id="email"
-                type="email"
-                placeholder="ejemplo@correo.com"
+                id="username"
+                type="text"
+                placeholder="Tu nombre de usuario"
+                value={formData.username}
+                onChange={handleInputChange}
+                required
                 className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
@@ -83,12 +153,21 @@ export default function LoginPage() {
                 id="password"
                 type="password"
                 placeholder="Tu contraseña"
+                value={formData.password}
+                onChange={handleInputChange}
+                required
                 className="mt-1 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
               />
             </div>
-          </div>
 
-          <Button className="w-full bg-blue-600 hover:bg-blue-700 py-3">Iniciar Sesión</Button>
+            <Button 
+              type="submit" 
+              disabled={isLoading}
+              className="w-full bg-blue-600 hover:bg-blue-700 py-3 disabled:opacity-50"
+            >
+              {isLoading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+            </Button>
+          </form>
 
           <div className="text-center space-y-2">
             <Link href="/forgot-password" className="text-blue-600 hover:underline text-sm">

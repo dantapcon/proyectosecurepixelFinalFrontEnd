@@ -1,0 +1,121 @@
+"use client"
+
+import React, { createContext, useContext, useState, useEffect } from 'react'
+import { userAPI } from '@/lib/api'
+
+interface User {
+  id: number
+  email: string
+  first_name: string
+  last_name: string
+  is_active: boolean
+  is_staff: boolean
+}
+
+interface AuthContextType {
+  user: User | null
+  isLoading: boolean
+  login: (username: string, password: string) => Promise<boolean>
+  logout: () => void
+  register: (userData: {
+    first_name: string
+    last_name: string
+    username: string
+    email: string
+    password: string
+    password_confirm: string
+  }) => Promise<boolean>
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    // Verificar si hay un usuario autenticado al cargar la app
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token')
+      if (token) {
+        try {
+          const response = await userAPI.getCurrentUser()
+          if (response.ok) {
+            setUser(response.data)
+          } else {
+            localStorage.removeItem('token')
+            localStorage.removeItem('user')
+          }
+        } catch (error) {
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
+        }
+      }
+      setIsLoading(false)
+    }
+
+    checkAuth()
+  }, [])
+
+  const login = async (username: string, password: string): Promise<boolean> => {
+    try {
+      const response = await userAPI.login({ username, password })
+      
+      if (response.ok) {
+        setUser(response.data.user)
+        localStorage.setItem('token', response.data.token)
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+        return true
+      }
+      return false
+    } catch (error) {
+      return false
+    }
+  }
+
+  const register = async (userData: {
+    first_name: string
+    last_name: string
+    username: string
+    email: string
+    password: string
+    password_confirm: string
+  }): Promise<boolean> => {
+    try {
+      const response = await userAPI.register(userData)
+      return response.ok
+    } catch (error) {
+      return false
+    }
+  }
+
+  const logout = async () => {
+    try {
+      await userAPI.logout()
+    } catch (error) {
+      // Continuar con el logout local incluso si falla el logout del servidor
+    } finally {
+      setUser(null)
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    }
+  }
+
+  const value = {
+    user,
+    isLoading,
+    login,
+    logout,
+    register,
+  }
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext)
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
+  return context
+}
