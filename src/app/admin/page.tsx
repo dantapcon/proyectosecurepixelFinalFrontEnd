@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,12 +23,29 @@ import {
   Search,
   Eye,
   Activity,
+  LogOut,
 } from "lucide-react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function AdminDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("7d")
   const [selectedModule, setSelectedModule] = useState("all")
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error durante el logout:', error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   // Mock data
   const systemStats = {
@@ -70,6 +88,15 @@ export default function AdminDashboard() {
                 <Settings className="h-4 w-4 mr-2" />
                 Configuración
               </Link>
+            </Button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {isLoggingOut ? 'Saliendo...' : 'Salir'}
             </Button>
           </div>
         </div>

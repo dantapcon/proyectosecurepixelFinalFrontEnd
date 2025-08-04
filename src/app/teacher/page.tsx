@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -20,11 +21,28 @@ import {
   Camera,
   Clock,
   Award,
+  LogOut,
 } from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
 
 export default function TeacherDashboard() {
   const [selectedClass, setSelectedClass] = useState("all")
   const [selectedModule, setSelectedModule] = useState("all")
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const { logout } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error durante el logout:', error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
 
   // Mock data for teacher dashboard
   const classStats = {
@@ -127,6 +145,15 @@ export default function TeacherDashboard() {
               </SelectContent>
             </Select>
             <Badge className="bg-blue-100 text-blue-800">Prof. Ana Rodríguez</Badge>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              {isLoggingOut ? 'Saliendo...' : 'Salir'}
+            </Button>
           </div>
         </div>
       </header>
