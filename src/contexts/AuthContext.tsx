@@ -15,7 +15,7 @@ interface User {
 interface AuthContextType {
   user: User | null
   isLoading: boolean
-  login: (username: string, password: string) => Promise<boolean>
+  login: (username: string, password: string) => Promise<{ success: boolean; user?: User }>
   logout: () => void
   register: (userData: {
     first_name: string
@@ -57,19 +57,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     checkAuth()
   }, [])
 
-  const login = async (username: string, password: string): Promise<boolean> => {
+  const login = async (username: string, password: string): Promise<{ success: boolean; user?: User }> => {
     try {
       const response = await userAPI.login({ username, password })
       
       if (response.ok) {
-        setUser(response.data.user)
+        // Primero guardamos el token
         localStorage.setItem('token', response.data.token)
-        localStorage.setItem('user', JSON.stringify(response.data.user))
-        return true
+        
+        // Luego obtenemos la información completa del usuario
+        const userResponse = await userAPI.getCurrentUser()
+        
+        if (userResponse.ok) {
+          setUser(userResponse.data)
+          localStorage.setItem('user', JSON.stringify(userResponse.data))
+          return { success: true, user: userResponse.data }
+        } else {
+          // Si falla obtener el usuario, limpiamos el token
+          localStorage.removeItem('token')
+          return { success: false }
+        }
       }
-      return false
+      return { success: false }
     } catch (error) {
-      return false
+      return { success: false }
     }
   }
 

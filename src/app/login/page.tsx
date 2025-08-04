@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Shield } from "lucide-react"
-import { userAPI } from "@/lib/api"
+import { useAuth } from "@/contexts/AuthContext"
+import { getRedirectPath } from "@/lib/api"
 
 export default function LoginPage() {
   const [formData, setFormData] = useState({
@@ -20,6 +21,7 @@ export default function LoginPage() {
   const [successMessage, setSuccessMessage] = useState('')
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { login, user } = useAuth()
 
   useEffect(() => {
     // Mostrar mensaje de éxito si viene del registro
@@ -43,19 +45,13 @@ export default function LoginPage() {
     setIsLoading(true)
 
     try {
-      const response = await userAPI.login({
-        username: formData.username,
-        password: formData.password
-      })
+      const result = await login(formData.username, formData.password)
 
-      if (response.ok) {
-        // Login exitoso - redirigir al dashboard
-        localStorage.setItem('user', JSON.stringify(response.data.user))
-        localStorage.setItem('token', response.data.token)
-        router.push('/dashboard')
+      if (result.success && result.user) {
+        const redirectPath = getRedirectPath(result.user)
+        router.push(redirectPath)
       } else {
-        // Error del servidor
-        setError(response.data.message || 'Credenciales incorrectas')
+        setError('Credenciales incorrectas')
       }
     } catch (error) {
       setError('Error de conexión. Verifica que el servidor esté funcionando.')
