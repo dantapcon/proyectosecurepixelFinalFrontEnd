@@ -123,21 +123,15 @@ export const userAPI = {
 export function getRedirectPath(user: any): string {
   console.log('Usuario para redirección:', user) // Para debug - puedes ver la estructura del usuario
   
-  // Verificar si es administrador (is_staff o is_superuser)
-  if (user.is_staff || user.is_superuser) {
+  // Usar el campo tipo_usuario del backend Django
+  if (user.tipo_usuario === 'administrador') {
     return '/admin'
   }
   
-  // Verificar si es profesor 
-  // AJUSTA ESTA LÓGICA según tu modelo de usuario:
-  // - Si tienes un campo user_type: user.user_type === 'teacher'
-  // - Si tienes un campo is_teacher: user.is_teacher
-  // - Si tienes grupos: user.groups?.includes('teacher')
-  // - Si tienes roles: user.role === 'teacher'
-  if (user.user_type === 'teacher' || user.is_teacher || user.groups?.includes('teacher')) {
+  if (user.tipo_usuario === 'profesor') {
     return '/teacher'
   }
   
-  // Por defecto, es estudiante
+  // Por defecto, es estudiante (tipo_usuario === 'alumno')
   return '/dashboard'
 }

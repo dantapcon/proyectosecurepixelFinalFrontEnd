@@ -469,7 +469,7 @@ export default function AdminSettingsPage() {
                                 >
                                   <option value="alumno">Estudiante</option>
                                   <option value="profesor">Profesor</option>
-                                  {getUserType(user) === 'administrador' && <option value="administrador">Administrador</option>}
+                                  <option value="administrador">Administrador</option>
                                 </select>
                               ) : (
                                 getUserTypeBadge(user)
@@ -500,7 +500,7 @@ export default function AdminSettingsPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => handleEditUser(user)}
-                                  disabled={user.is_superuser} // No permitir editar superusuarios
+                                  disabled={getUserType(user) === 'administrador'} // No permitir editar administradores principales
                                 >
                                   <Edit className="h-4 w-4 mr-1" />
                                   Editar
