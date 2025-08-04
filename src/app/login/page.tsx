@@ -166,9 +166,7 @@ export default function LoginPage() {
           </form>
 
           <div className="text-center space-y-2">
-            <Link href="/forgot-password" className="text-blue-600 hover:underline text-sm">
-              ¿Olvidaste tu contraseña?
-            </Link>
+            
             <p className="text-gray-600 text-sm">
               ¿No tienes una cuenta?{" "}
               <Link href="/register" className="text-blue-600 hover:underline">
