@@ -7,8 +7,8 @@ export const API_ENDPOINTS = {
   LOGIN: `${API_BASE_URL}/api/usuarios/login`,
   LOGOUT: `${API_BASE_URL}/api/usuarios/logout`,
   USER_PROFILE: `${API_BASE_URL}/api/usuarios/yo`,
-  UPDATE_USER: `${API_BASE_URL}/api/usuarios/update`,
-  CHANGE_PASSWORD: `${API_BASE_URL}/api/usuarios/cambiar-contrasena`,
+  UPDATE_USER: (userId: number) => `${API_BASE_URL}/api/usuarios/update/${userId}`,
+  CHANGE_PASSWORD: (userId: number) => `${API_BASE_URL}/api/usuarios/cambiar-contrasena/${userId}`,
   USERS_LIST: `${API_BASE_URL}/api/usuarios/usuarios`,
   
   // Enseñanza y preguntas (para futuras implementaciones)
@@ -101,6 +101,20 @@ export const userAPI = {
   getCurrentUser: async () => {
     return apiRequest(API_ENDPOINTS.USER_PROFILE, {
       method: 'GET',
+    })
+  },
+
+  updateUser: async (userId: number, userData: any) => {
+    return apiRequest(API_ENDPOINTS.UPDATE_USER(userId), {
+      method: 'PUT',
+      body: JSON.stringify(userData),
+    })
+  },
+
+  changePassword: async (userId: number, passwordData: any) => {
+    return apiRequest(API_ENDPOINTS.CHANGE_PASSWORD(userId), {
+      method: 'PUT',
+      body: JSON.stringify(passwordData),
     })
   },
 }

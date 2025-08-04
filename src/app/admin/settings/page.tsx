@@ -1,120 +1,283 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { 
+  Shield, 
+  Users, 
+  UserCheck, 
+  Search, 
+  Edit, 
+  Save, 
+  X, 
+  ArrowLeft, 
+  LogOut 
+} from "lucide-react"
+import { useAuth } from "@/contexts/AuthContext"
+import { apiRequest, API_ENDPOINTS } from "@/lib/api"
 
-// Types
-interface Teacher {
+// Types actualizados para coincidir con el backend
+interface User {
   id: number
-  name: string
+  username: string
   email: string
-  phone: string
-  department: string
-  joinDate: string
-  status: "active" | "inactive"
-  classesCount: number
+  first_name: string
+  last_name: string
+  is_active: boolean
+  is_staff: boolean
+  is_superuser?: boolean
+  tipo_usuario?: string
+  date_joined: string
 }
 
-interface Class {
-  id: number
-  name: string
-  code: string
-  teacher: string
-  teacherId: number
-  studentsCount: number
-  schedule: string
-  semester: string
-  status: "active" | "inactive"
-}
-
-interface Student {
-  id: number
-  name: string
+interface EditUserForm {
+  first_name: string
+  last_name: string
   email: string
-  studentId: string
-  classId: number
-  className: string
-  enrollDate: string
-  status: "active" | "inactive"
-  progress: number
+  username: string
+  tipo_usuario: string
 }
 
 export default function AdminSettingsPage() {
-  // Mock data
-  const [teachers, setTeachers] = useState<Teacher[]>([
-    {
-      id: 1,
-      name: "Ana Rodríguez",
-      email: "ana.rodriguez@university.edu",
-      phone: "+593 99 123 4567",
-      department: "Ingeniería en Sistemas",
-      joinDate: "2022-03-15",
-      status: "active",
-      classesCount: 3,
-    },
-    {
-      id: 2,
-      name: "Carlos Mendoza",
-      email: "carlos.mendoza@university.edu",
-      phone: "+593 99 234 5678",
-      department: "Ciberseguridad",
-      joinDate: "2021-08-20",
-      status: "active",
-      classesCount: 2,
-    },
-  ])
+  const [users, setUsers] = useState<User[]>([])
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedTab, setSelectedTab] = useState("all")
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [editForm, setEditForm] = useState<EditUserForm>({
+    first_name: "",
+    last_name: "",
+    email: "",
+    username: "",
+    tipo_usuario: "alumno"
+  })
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [hasToken, setHasToken] = useState(false)
+  const { logout, user } = useAuth()
+  const router = useRouter()
 
-  const [classes, setClasses] = useState<Class[]>([
-    {
-      id: 1,
-      name: "Ciberseguridad Básica",
-      code: "CS101",
-      teacher: "Ana Rodríguez",
-      teacherId: 1,
-      studentsCount: 32,
-      schedule: "Lun-Mie-Vie 10:00-12:00",
-      semester: "2024-1",
-      status: "active",
-    },
-    {
-      id: 2,
-      name: "Seguridad Avanzada",
-      code: "CS201",
-      teacher: "Carlos Mendoza",
-      teacherId: 2,
-      studentsCount: 28,
-      schedule: "Mar-Jue 14:00-16:00",
-      semester: "2024-1",
-      status: "active",
-    },
-  ])
+  // Función helper para determinar el tipo de usuario
+  const getUserType = (user: User): string => {
+    if (user.tipo_usuario) {
+      return user.tipo_usuario
+    }
+    // Fallback basado en los campos existentes
+    if (user.is_superuser) return 'administrador'
+    if (user.is_staff) return 'profesor'
+    return 'alumno'
+  }
 
-  const [students, setStudents] = useState<Student[]>([
-    {
-      id: 1,
-      name: "Juan Pérez",
-      email: "juan.perez@student.edu",
-      studentId: "2021001234",
-      classId: 1,
-      className: "Ciberseguridad Básica",
-      enrollDate: "2024-02-15",
-      status: "active",
-      progress: 68,
-    },
-    {
-      id: 2,
-      name: "María García",
-      email: "maria.garcia@student.edu",
-      studentId: "2021001235",
-      classId: 1,
-      className: "Ciberseguridad Básica",
-      enrollDate: "2024-02-15",
-      status: "active",
-      progress: 85,
-    },
-  ])
+  // Verificar token al montar el componente
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setHasToken(!!localStorage.getItem('token'))
+    }
+  }, [])
 
-  const [activeTab, setActiveTab] = useState("teachers")
+  // Cargar usuarios del backend solo si hay un usuario autenticado
+  useEffect(() => {
+    if (user) {
+      console.log('Usuario autenticado:', user)
+      loadUsers()
+    } else {
+      console.log('No hay usuario autenticado, redirigiendo...')
+      router.push('/login')
+    }
+  }, [user, router])
+
+  // Filtrar usuarios cuando cambia el término de búsqueda o la pestaña
+  useEffect(() => {
+    filterUsers()
+  }, [users, searchTerm, selectedTab])
+
+  const loadUsers = async () => {
+    setIsLoading(true)
+    setError("")
+    try {
+      // Verificar que el token esté disponible
+      const token = localStorage.getItem('token')
+      console.log('Token disponible para cargar usuarios:', token ? 'Sí' : 'No')
+      console.log('Enviando petición a:', API_ENDPOINTS.USERS_LIST)
+      
+      const response = await apiRequest(API_ENDPOINTS.USERS_LIST, {
+        method: 'GET'
+      })
+      
+      console.log('Respuesta de cargar usuarios:', response)
+      
+      if (response.ok) {
+        console.log('Usuarios cargados:', response.data)
+        // Asegurar que siempre se asigne un array válido
+        const usersData = Array.isArray(response.data) ? response.data : []
+        setUsers(usersData)
+      } else {
+        console.error('Error al cargar usuarios:', response)
+        
+        // Si el endpoint no funciona, intentar con un endpoint alternativo
+        if (response.status === 404) {
+          console.log('Probando endpoint alternativo...')
+          const alternativeResponse = await apiRequest(`${API_ENDPOINTS.USERS_LIST.replace('/usuarios', '')}`, {
+            method: 'GET'
+          })
+          
+          if (alternativeResponse.ok) {
+            console.log('Usuarios cargados con endpoint alternativo:', alternativeResponse.data)
+            const alternativeUsersData = Array.isArray(alternativeResponse.data) ? alternativeResponse.data : []
+            setUsers(alternativeUsersData)
+            return
+          }
+        }
+        
+        setError(`Error al cargar los usuarios: ${response.data?.message || response.status}`)
+        // Asegurar que users siga siendo un array vacío en caso de error
+        setUsers([])
+      }
+    } catch (error) {
+      console.error('Error de conexión:', error)
+      setError('Error de conexión al servidor')
+      // Asegurar que users siga siendo un array vacío en caso de error
+      setUsers([])
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const filterUsers = () => {
+    // Verificar que users sea un array válido antes de filtrar
+    if (!Array.isArray(users)) {
+      console.log('Users no es un array válido:', users)
+      setFilteredUsers([])
+      return
+    }
+
+    let filtered = users.filter(user => 
+      user.first_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.last_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.username?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+
+    if (selectedTab === "students") {
+      filtered = filtered.filter(user => getUserType(user) === 'alumno')
+    } else if (selectedTab === "teachers") {
+      filtered = filtered.filter(user => getUserType(user) === 'profesor')
+    } else if (selectedTab === "admins") {
+      filtered = filtered.filter(user => getUserType(user) === 'administrador')
+    }
+
+    setFilteredUsers(filtered)
+  }
+
+  const handleEditUser = (user: User) => {
+    setEditingUser(user)
+    setEditForm({
+      first_name: user.first_name,
+      last_name: user.last_name,
+      email: user.email,
+      username: user.username,
+      tipo_usuario: getUserType(user)
+    })
+  }
+
+  const handleSaveUser = async () => {
+    if (!editingUser) return
+
+    setIsLoading(true)
+    try {
+      console.log('Guardando usuario:', editingUser.id, editForm)
+      
+      const response = await apiRequest(API_ENDPOINTS.UPDATE_USER(editingUser.id), {
+        method: 'PUT',
+        body: JSON.stringify({
+          ...editForm
+        })
+      })
+
+      console.log('Respuesta de actualizar usuario:', response)
+
+      if (response.ok) {
+        await loadUsers() // Recargar la lista
+        setEditingUser(null)
+        setError("")
+      } else {
+        console.error('Error al actualizar usuario:', response)
+        setError(response.data.message || 'Error al actualizar usuario')
+      }
+    } catch (error) {
+      console.error('Error de conexión al actualizar usuario:', error)
+      setError('Error de conexión al servidor')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditingUser(null)
+    setEditForm({
+      first_name: "",
+      last_name: "",
+      email: "",
+      username: "",
+      tipo_usuario: "alumno"
+    })
+  }
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true)
+    try {
+      await logout()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error durante el logout:', error)
+    } finally {
+      setIsLoggingOut(false)
+    }
+  }
+
+  const getUserTypeBadge = (user: User) => {
+    const userType = getUserType(user)
+    if (userType === 'administrador') {
+      return <Badge className="bg-red-100 text-red-800">Administrador</Badge>
+    } else if (userType === 'profesor') {
+      return <Badge className="bg-blue-100 text-blue-800">Profesor</Badge>
+    } else {
+      return <Badge className="bg-green-100 text-green-800">Estudiante</Badge>
+    }
+  }
+
+  const getTabCounts = () => {
+    // Verificar que users sea un array válido antes de contar
+    if (!Array.isArray(users)) {
+      return { students: 0, teachers: 0, admins: 0, total: 0 }
+    }
+    
+    const students = users.filter(user => {
+      const userType = getUserType(user)
+      return userType === 'alumno'
+    }).length
+    
+    const teachers = users.filter(user => {
+      const userType = getUserType(user)
+      return userType === 'profesor'
+    }).length
+    
+    const admins = users.filter(user => {
+      const userType = getUserType(user)
+      return userType === 'administrador'
+    }).length
+    
+    return { students, teachers, admins, total: users.length }
+  }
+
+  const counts = getTabCounts()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
@@ -122,256 +285,243 @@ export default function AdminSettingsPage() {
       <header className="bg-white border-b shadow-sm">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/admin">
-              <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors">
-                ← Volver al Admin
-              </button>
-            </Link>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/admin">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Volver al Panel
+              </Link>
+            </Button>
             <div className="flex items-center space-x-2">
-              <div className="h-6 w-6 bg-blue-600 rounded flex items-center justify-center">
-                <span className="text-white font-bold text-sm">S</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">Configuración del Sistema</span>
+              <Shield className="h-8 w-8 text-blue-600" />
+              <span className="text-2xl font-bold text-gray-900">Gestión de Usuarios</span>
             </div>
           </div>
-          <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded-full">Panel CRUD</span>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            {isLoggingOut ? 'Saliendo...' : 'Salir'}
+          </Button>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Overview */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Usuarios y Clases</h1>
-          <p className="text-gray-600">Administra profesores, clases y estudiantes del sistema</p>
-        </div>
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            <p className="font-medium">Error:</p>
+            <p>{error}</p>
+            <details className="mt-2">
+              <summary className="cursor-pointer text-sm">Información de debug</summary>
+              <div className="mt-2 text-xs">
+                <p>Token disponible: {hasToken ? 'Sí' : 'No'}</p>
+                <p>Usuario autenticado: {user ? `${user.first_name} ${user.last_name}` : 'No'}</p>
+                <p>Endpoint: {API_ENDPOINTS.USERS_LIST}</p>
+              </div>
+            </details>
+          </div>
+        )}
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <div className="border border-blue-100 p-6 rounded-lg bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Profesores</p>
-                <p className="text-3xl font-bold text-blue-600">{teachers.length}</p>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Total Usuarios</p>
+                  <p className="text-2xl font-bold text-gray-900">{counts.total}</p>
+                </div>
+                <Users className="h-8 w-8 text-blue-600" />
               </div>
-              <span className="text-4xl text-blue-600">👨‍🏫</span>
-            </div>
-          </div>
-
-          <div className="border border-green-100 p-6 rounded-lg bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Clases</p>
-                <p className="text-3xl font-bold text-green-600">{classes.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Estudiantes</p>
+                  <p className="text-2xl font-bold text-green-600">{counts.students}</p>
+                </div>
+                <UserCheck className="h-8 w-8 text-green-600" />
               </div>
-              <span className="text-4xl text-green-600">📚</span>
-            </div>
-          </div>
-
-          <div className="border border-purple-100 p-6 rounded-lg bg-white">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Estudiantes</p>
-                <p className="text-3xl font-bold text-purple-600">{students.length}</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Profesores</p>
+                  <p className="text-2xl font-bold text-blue-600">{counts.teachers}</p>
+                </div>
+                <UserCheck className="h-8 w-8 text-blue-600" />
               </div>
-              <span className="text-4xl text-purple-600">👥</span>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Administradores</p>
+                  <p className="text-2xl font-bold text-red-600">{counts.admins}</p>
+                </div>
+                <UserCheck className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-lg border shadow-sm">
-          <div className="border-b">
-            <nav className="flex space-x-8 px-6">
-              <button
-                onClick={() => setActiveTab("teachers")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "teachers"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Profesores
-              </button>
-              <button
-                onClick={() => setActiveTab("classes")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "classes"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Clases
-              </button>
-              <button
-                onClick={() => setActiveTab("students")}
-                className={`py-4 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === "students"
-                    ? "border-blue-500 text-blue-600"
-                    : "border-transparent text-gray-500 hover:text-gray-700"
-                }`}
-              >
-                Estudiantes
-              </button>
-            </nav>
-          </div>
-
-          {/* Teachers Tab */}
-          {activeTab === "teachers" && (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <span className="text-blue-600 mr-2">👨‍🏫</span>
-                  Gestión de Profesores
-                </h2>
-                <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors">
-                  ➕ Nuevo Profesor
-                </button>
-              </div>
-              <div className="space-y-4">
-                {teachers.map((teacher) => (
-                  <div
-                    key={teacher.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
-                        <span className="text-blue-600 font-semibold">
-                          {teacher.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{teacher.name}</p>
-                        <p className="text-sm text-gray-600">{teacher.email}</p>
-                        <p className="text-sm text-gray-600">{teacher.department}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          teacher.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {teacher.status === "active" ? "Activo" : "Inactivo"}
-                      </span>
-                      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors">
-                        ✏️
-                      </button>
-                      <button className="px-3 py-1 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50 transition-colors">
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))}
+        {/* Search and Filters */}
+        <Card className="mb-8">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+              <CardTitle>Gestión de Usuarios</CardTitle>
+              <div className="flex gap-4 items-center">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Buscar usuarios..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 w-64"
+                  />
+                </div>
               </div>
             </div>
-          )}
+          </CardHeader>
+          <CardContent>
+            <Tabs value={selectedTab} onValueChange={setSelectedTab}>
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="all">Todos ({counts.total})</TabsTrigger>
+                <TabsTrigger value="students">Estudiantes ({counts.students})</TabsTrigger>
+                <TabsTrigger value="teachers">Profesores ({counts.teachers})</TabsTrigger>
+                <TabsTrigger value="admins">Administradores ({counts.admins})</TabsTrigger>
+              </TabsList>
 
-          {/* Classes Tab */}
-          {activeTab === "classes" && (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <span className="text-green-600 mr-2">📚</span>
-                  Gestión de Clases
-                </h2>
-                <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md transition-colors">
-                  ➕ Nueva Clase
-                </button>
-              </div>
-              <div className="space-y-4">
-                {classes.map((classItem) => (
-                  <div
-                    key={classItem.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                        <span className="text-green-600 font-semibold">{classItem.code}</span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{classItem.name}</p>
-                        <p className="text-sm text-gray-600">Profesor: {classItem.teacher}</p>
-                        <p className="text-sm text-gray-600">{classItem.schedule}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          classItem.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {classItem.status === "active" ? "Activa" : "Inactiva"}
-                      </span>
-                      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors">
-                        ✏️
-                      </button>
-                      <button className="px-3 py-1 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50 transition-colors">
-                        🗑️
-                      </button>
-                    </div>
+              <TabsContent value={selectedTab} className="mt-6">
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-500">Cargando usuarios...</p>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Students Tab */}
-          {activeTab === "students" && (
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-semibold flex items-center">
-                  <span className="text-purple-600 mr-2">👥</span>
-                  Gestión de Estudiantes
-                </h2>
-                <button className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md transition-colors">
-                  ➕ Nuevo Estudiante
-                </button>
-              </div>
-              <div className="space-y-4">
-                {students.map((student) => (
-                  <div
-                    key={student.id}
-                    className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
-                        <span className="text-purple-600 font-semibold">
-                          {student.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")}
-                        </span>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Usuario</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Tipo</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Acciones</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredUsers.map((user) => (
+                          <tr key={user.id} className="border-b hover:bg-gray-50">
+                            <td className="py-3 px-4">
+                              {editingUser?.id === user.id ? (
+                                <div className="space-y-2">
+                                  <Input
+                                    value={editForm.first_name}
+                                    onChange={(e) => setEditForm({...editForm, first_name: e.target.value})}
+                                    placeholder="Nombre"
+                                    className="text-sm"
+                                  />
+                                  <Input
+                                    value={editForm.last_name}
+                                    onChange={(e) => setEditForm({...editForm, last_name: e.target.value})}
+                                    placeholder="Apellido"
+                                    className="text-sm"
+                                  />
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="font-medium">{user.first_name} {user.last_name}</p>
+                                  <p className="text-sm text-gray-500">@{user.username}</p>
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {editingUser?.id === user.id ? (
+                                <Input
+                                  value={editForm.email}
+                                  onChange={(e) => setEditForm({...editForm, email: e.target.value})}
+                                  placeholder="Email"
+                                  className="text-sm"
+                                />
+                              ) : (
+                                user.email
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {editingUser?.id === user.id ? (
+                                <select
+                                  value={editForm.tipo_usuario}
+                                  onChange={(e) => {
+                                    const value = e.target.value
+                                    setEditForm({
+                                      ...editForm,
+                                      tipo_usuario: value
+                                    })
+                                  }}
+                                  className="text-sm border border-gray-300 rounded px-2 py-1"
+                                  disabled={getUserType(user) === 'administrador'} // No permitir cambiar tipo de admin principal
+                                >
+                                  <option value="alumno">Estudiante</option>
+                                  <option value="profesor">Profesor</option>
+                                  {getUserType(user) === 'administrador' && <option value="administrador">Administrador</option>}
+                                </select>
+                              ) : (
+                                getUserTypeBadge(user)
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {editingUser?.id === user.id ? (
+                                <div className="flex gap-2">
+                                  <Button
+                                    size="sm"
+                                    onClick={handleSaveUser}
+                                    disabled={isLoading}
+                                  >
+                                    <Save className="h-4 w-4 mr-1" />
+                                    Guardar
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={handleCancelEdit}
+                                  >
+                                    <X className="h-4 w-4 mr-1" />
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditUser(user)}
+                                  disabled={user.is_superuser} // No permitir editar superusuarios
+                                >
+                                  <Edit className="h-4 w-4 mr-1" />
+                                  Editar
+                                </Button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {filteredUsers.length === 0 && (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">No se encontraron usuarios</p>
                       </div>
-                      <div>
-                        <p className="font-medium text-gray-900">{student.name}</p>
-                        <p className="text-sm text-gray-600">{student.email}</p>
-                        <p className="text-sm text-gray-600">ID: {student.studentId}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span
-                        className={`px-2 py-1 text-xs rounded-full ${
-                          student.status === "active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {student.status === "active" ? "Activo" : "Inactivo"}
-                      </span>
-                      <button className="px-3 py-1 border border-gray-300 rounded-md text-sm hover:bg-gray-50 transition-colors">
-                        ✏️
-                      </button>
-                      <button className="px-3 py-1 border border-red-300 text-red-600 rounded-md text-sm hover:bg-red-50 transition-colors">
-                        🗑️
-                      </button>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+                )}
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
