@@ -11,6 +11,15 @@ export const API_ENDPOINTS = {
   CHANGE_PASSWORD: (userId: number) => `${API_BASE_URL}/api/usuarios/cambiar-contrasena/${userId}`,
   USERS_LIST: `${API_BASE_URL}/api/usuarios/usuarios`,
   
+  // Cursos
+  COURSES_LIST: `${API_BASE_URL}/api/ensennanza/cursos/`,
+  COURSE_DETAIL: (courseId: number) => `${API_BASE_URL}/api/ensennanza/cursos/${courseId}/`,
+  
+  // Temas
+  TOPICS_LIST: `${API_BASE_URL}/api/ensennanza/temas/`,
+  TOPIC_DETAIL: (topicId: number) => `${API_BASE_URL}/api/ensennanza/temas/${topicId}/`,
+  NEXT_TOPIC: `${API_BASE_URL}/api/ensennanza/temas/siguiente/`,
+  
   // Enseñanza y preguntas (para futuras implementaciones)
   TEACHING: `${API_BASE_URL}/api/ensennanza/`,
   QUESTIONS: `${API_BASE_URL}/api/preguntas/`,
@@ -104,6 +113,12 @@ export const userAPI = {
     })
   },
 
+  getAllUsers: async () => {
+    return apiRequest(API_ENDPOINTS.USERS_LIST, {
+      method: 'GET',
+    })
+  },
+
   updateUser: async (userId: number, userData: any) => {
     return apiRequest(API_ENDPOINTS.UPDATE_USER(userId), {
       method: 'PUT',
@@ -115,6 +130,93 @@ export const userAPI = {
     return apiRequest(API_ENDPOINTS.CHANGE_PASSWORD(userId), {
       method: 'PUT',
       body: JSON.stringify(passwordData),
+    })
+  },
+}
+
+// API para Cursos
+export const courseAPI = {
+  // Listar todos los cursos
+  getAllCourses: async () => {
+    return apiRequest(API_ENDPOINTS.COURSES_LIST, {
+      method: 'GET',
+    })
+  },
+
+  // Crear nuevo curso
+  createCourse: async (courseData: any) => {
+    return apiRequest(API_ENDPOINTS.COURSES_LIST, {
+      method: 'POST',
+      body: JSON.stringify(courseData),
+    })
+  },
+
+  // Obtener curso específico
+  getCourse: async (courseId: number) => {
+    return apiRequest(API_ENDPOINTS.COURSE_DETAIL(courseId), {
+      method: 'GET',
+    })
+  },
+
+  // Actualizar curso
+  updateCourse: async (courseId: number, courseData: any) => {
+    return apiRequest(API_ENDPOINTS.COURSE_DETAIL(courseId), {
+      method: 'PUT',
+      body: JSON.stringify(courseData),
+    })
+  },
+
+  // Eliminar curso
+  deleteCourse: async (courseId: number) => {
+    return apiRequest(API_ENDPOINTS.COURSE_DETAIL(courseId), {
+      method: 'DELETE',
+    })
+  },
+}
+
+// API para Temas
+export const topicAPI = {
+  // Listar todos los temas
+  getAllTopics: async () => {
+    return apiRequest(API_ENDPOINTS.TOPICS_LIST, {
+      method: 'GET',
+    })
+  },
+
+  // Crear nuevo tema
+  createTopic: async (topicData: any) => {
+    return apiRequest(API_ENDPOINTS.TOPICS_LIST, {
+      method: 'POST',
+      body: JSON.stringify(topicData),
+    })
+  },
+
+  // Obtener tema específico
+  getTopic: async (topicId: number) => {
+    return apiRequest(API_ENDPOINTS.TOPIC_DETAIL(topicId), {
+      method: 'GET',
+    })
+  },
+
+  // Actualizar tema
+  updateTopic: async (topicId: number, topicData: any) => {
+    return apiRequest(API_ENDPOINTS.TOPIC_DETAIL(topicId), {
+      method: 'PUT',
+      body: JSON.stringify(topicData),
+    })
+  },
+
+  // Eliminar tema
+  deleteTopic: async (topicId: number) => {
+    return apiRequest(API_ENDPOINTS.TOPIC_DETAIL(topicId), {
+      method: 'DELETE',
+    })
+  },
+
+  // Obtener siguiente tema
+  getNextTopic: async () => {
+    return apiRequest(API_ENDPOINTS.NEXT_TOPIC, {
+      method: 'GET',
     })
   },
 }

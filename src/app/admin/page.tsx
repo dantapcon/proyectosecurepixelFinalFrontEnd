@@ -13,6 +13,7 @@ import {
   Users,
   BarChart3,
   Settings,
+  Book,
   Camera,
   Brain,
   AlertTriangle,
@@ -83,6 +84,12 @@ export default function AdminDashboard() {
           </div>
           <div className="flex items-center space-x-4">
             <Badge className="bg-green-100 text-green-800">Sistema Operativo</Badge>
+            <Button variant="outline" size="sm" asChild>
+              <Link href="/admin/courses">
+                <Book className="h-4 w-4 mr-2" />
+                Gestión de Cursos
+              </Link>
+            </Button>
             <Button variant="outline" size="sm" asChild>
               <Link href="/admin/settings">
                 <Settings className="h-4 w-4 mr-2" />
