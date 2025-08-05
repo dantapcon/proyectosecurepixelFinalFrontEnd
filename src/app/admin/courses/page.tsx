@@ -329,12 +329,6 @@ export default function AdminCoursesPage() {
       setCourses(prevCourses => prevCourses.filter(course => course.id !== courseId))
       setTopics(prevTopics => prevTopics.filter(topic => topic.curso !== courseId))
       
-      // Recargar datos después de un breve delay para asegurar sincronización
-      setTimeout(() => {
-        loadCourses()
-        loadTopics()
-      }, 500)
-      
       setError("")
       alert('Curso eliminado exitosamente')
       
@@ -344,12 +338,6 @@ export default function AdminCoursesPage() {
       // Pero aún así intentar actualizar la interfaz
       setCourses(prevCourses => prevCourses.filter(course => course.id !== courseId))
       setTopics(prevTopics => prevTopics.filter(topic => topic.curso !== courseId))
-      
-      // Recargar para verificar el estado real
-      setTimeout(() => {
-        loadCourses()
-        loadTopics()
-      }, 500)
     } finally {
       setIsLoading(false)
     }
@@ -442,11 +430,6 @@ export default function AdminCoursesPage() {
       // Actualizar el estado local inmediatamente
       setTopics(prevTopics => prevTopics.filter(topic => topic.id !== topicId))
       
-      // Recargar datos después de un breve delay para asegurar sincronización
-      setTimeout(() => {
-        loadTopics()
-      }, 500)
-      
       setError("")
       alert('Tema eliminado exitosamente')
       
@@ -455,11 +438,6 @@ export default function AdminCoursesPage() {
       // Solo mostrar error si realmente falla la conexión
       // Pero aún así intentar actualizar la interfaz
       setTopics(prevTopics => prevTopics.filter(topic => topic.id !== topicId))
-      
-      // Recargar para verificar el estado real
-      setTimeout(() => {
-        loadTopics()
-      }, 500)
     } finally {
       setIsLoading(false)
     }

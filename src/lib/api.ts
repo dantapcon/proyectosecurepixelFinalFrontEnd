@@ -43,11 +43,30 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
     const response = await fetch(endpoint, defaultOptions)
     
     let data;
-    try {
-      data = await response.json()
-    } catch (e) {
-      // Si no es JSON válido, usar el texto de respuesta
-      data = { message: await response.text() }
+    
+    // Clonar la respuesta ANTES de leer el stream para poder leerla múltiples veces si es necesario
+    const responseClone = response.clone()
+    
+    // Verificar si hay contenido para leer
+    const contentType = response.headers.get('content-type')
+    const hasContent = response.status !== 204 && response.status !== 205
+    
+    if (hasContent) {
+      try {
+        // Intentar leer como JSON primero
+        data = await response.json()
+      } catch (e) {
+        try {
+          // Si falla el JSON, leer como texto usando el clon
+          const textData = await responseClone.text()
+          data = { message: textData || 'Respuesta vacía' }
+        } catch (e2) {
+          data = { message: 'Respuesta no válida' }
+        }
+      }
+    } else {
+      // Respuesta sin contenido (como DELETE exitoso con status 204)
+      data = { message: 'Operación completada exitosamente' }
     }
     
     console.log('Response status:', response.status, 'Data:', data)
