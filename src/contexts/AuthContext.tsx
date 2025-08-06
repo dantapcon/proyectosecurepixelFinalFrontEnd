@@ -12,6 +12,7 @@ interface User {
   is_staff: boolean
   is_superuser?: boolean
   tipo_usuario: string
+  curso?: number
 }
 
 interface AuthContextType {

@@ -1,19 +1,132 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Shield, BookOpen, Brain, Camera, TrendingUp, Clock, Award, Target, User, Settings, LogOut } from "lucide-react"
+import { Shield, BookOpen, Brain, Camera, TrendingUp, Clock, Award, Target, User, Settings, LogOut, PlayCircle } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
+import { apiRequest, API_ENDPOINTS, topicAPI, courseAPI } from "@/lib/api"
+
+// Interfaces para los datos
+interface Course {
+  id: number
+  nombreCurso: string
+  profesor: number
+  dificultadMinima: number
+  dificultadMaxima: number
+}
+
+interface Topic {
+  id: number
+  titulo: string
+  contenido: string
+  curso: number
+  orden: number
+}
 
 export default function DashboardPage() {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
-  const { logout } = useAuth()
+  const [userCourse, setUserCourse] = useState<Course | null>(null)
+  const [courseTopics, setCourseTopics] = useState<Topic[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+  const { logout, user } = useAuth()
   const router = useRouter()
+
+  // Cargar datos del usuario cuando se monta el componente
+  useEffect(() => {
+    if (user) {
+      console.log('Usuario autenticado:', user)
+      loadUserCourseAndTopics()
+    } else {
+      console.log('No hay usuario autenticado, redirigiendo...')
+      router.push('/login')
+    }
+  }, [user, router])
+
+  // Función para cargar el curso del usuario y sus temas
+  const loadUserCourseAndTopics = async () => {
+    setIsLoading(true)
+    setError("")
+    
+    try {
+      console.log('Usuario completo:', user)
+      console.log('Curso del usuario:', user?.curso)
+      
+      // Si el usuario tiene un curso asignado, cargar los datos
+      if (user?.curso) {
+        console.log('Cargando curso del usuario:', user.curso)
+        await Promise.all([
+          loadUserCourse(user.curso),
+          loadCourseTopics(user.curso)
+        ])
+      } else {
+        console.log('Usuario sin curso asignado')
+        setUserCourse(null)
+        setCourseTopics([])
+        setError('No tienes un curso asignado. Contacta al administrador.')
+      }
+    } catch (error) {
+      console.error('Error cargando datos del curso:', error)
+      setError('Error al cargar los datos del curso')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Cargar información del curso del usuario
+  const loadUserCourse = async (courseId: number) => {
+    try {
+      console.log('Obteniendo curso con ID:', courseId)
+      const response = await courseAPI.getCourse(courseId)
+      console.log('Respuesta del curso:', response)
+      
+      if (response.ok) {
+        setUserCourse(response.data)
+        console.log('Curso cargado exitosamente:', response.data)
+      } else {
+        console.error('Error al cargar curso:', response)
+        setError('Error al cargar información del curso')
+      }
+    } catch (error) {
+      console.error('Error loading course:', error)
+      setError('Error al cargar el curso')
+    }
+  }
+
+  // Cargar temas del curso
+  const loadCourseTopics = async (courseId: number) => {
+    try {
+      console.log('Obteniendo todos los temas...')
+      const response = await topicAPI.getAllTopics()
+      console.log('Respuesta de todos los temas:', response)
+      
+      if (response.ok) {
+        console.log('Todos los temas:', response.data)
+        // Filtrar solo los temas del curso del usuario
+        const userTopics = response.data.filter((topic: Topic) => {
+          console.log(`Tema ${topic.id}: curso ${topic.curso}, buscando curso ${courseId}`)
+          return topic.curso === courseId
+        })
+        console.log('Temas filtrados para el curso:', userTopics)
+        
+        // Ordenar por el campo orden
+        userTopics.sort((a: Topic, b: Topic) => a.orden - b.orden)
+        setCourseTopics(userTopics)
+        console.log('Temas del curso cargados y ordenados:', userTopics)
+      } else {
+        console.error('Error al cargar temas:', response)
+        setError('Error al cargar los temas del curso')
+      }
+    } catch (error) {
+      console.error('Error loading topics:', error)
+      setError('Error al cargar los temas')
+    }
+  }
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -38,7 +151,9 @@ export default function DashboardPage() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <User className="h-5 w-5 text-gray-600" />
-              <span className="text-gray-700">Juan Pérez</span>
+              <span className="text-gray-700">
+                {user ? `${user.first_name} ${user.last_name}` : 'Usuario'}
+              </span>
             </div>
             <Button variant="outline" size="sm">
               <Settings className="h-4 w-4 mr-2" />
@@ -60,9 +175,30 @@ export default function DashboardPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Welcome Section */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">¡Bienvenido de vuelta, Juan!</h1>
-          <p className="text-gray-600">Continúa tu aprendizaje en ciberseguridad con nuestro sistema adaptativo</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            ¡Bienvenido de vuelta, {user?.first_name || 'Estudiante'}!
+          </h1>
+          <p className="text-gray-600">
+            {userCourse 
+              ? `Continúa tu aprendizaje en: ${userCourse.nombreCurso}` 
+              : 'Continúa tu aprendizaje en ciberseguridad con nuestro sistema adaptativo'
+            }
+          </p>
+          {!userCourse && !isLoading && (
+            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-amber-800 text-sm">
+                ⚠️ No tienes un curso asignado. Contacta a tu administrador para que te asigne un curso.
+              </p>
+            </div>
+          )}
         </div>
+
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+            <p className="font-medium">Error:</p>
+            <p>{error}</p>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
@@ -71,7 +207,11 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-600">Progreso Total</p>
-                  <p className="text-2xl font-bold text-blue-600">68%</p>
+                  <p className="text-2xl font-bold text-blue-600">
+                    {courseTopics.length > 0 
+                      ? Math.round((courseTopics.length * 20) / courseTopics.length) 
+                      : 0}%
+                  </p>
                 </div>
                 <TrendingUp className="h-8 w-8 text-blue-600" />
               </div>
@@ -82,8 +222,10 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Módulos Completados</p>
-                  <p className="text-2xl font-bold text-green-600">4/6</p>
+                  <p className="text-sm text-gray-600">Temas Disponibles</p>
+                  <p className="text-2xl font-bold text-green-600">
+                    {courseTopics.length}
+                  </p>
                 </div>
                 <Award className="h-8 w-8 text-green-600" />
               </div>
@@ -94,10 +236,12 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Tiempo de Estudio</p>
-                  <p className="text-2xl font-bold text-orange-600">12h</p>
+                  <p className="text-sm text-gray-600">Curso Actual</p>
+                  <p className="text-lg font-bold text-orange-600">
+                    {userCourse ? userCourse.nombreCurso.substring(0, 12) + '...' : 'Sin curso'}
+                  </p>
                 </div>
-                <Clock className="h-8 w-8 text-orange-600" />
+                <BookOpen className="h-8 w-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
@@ -106,8 +250,10 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Puntuación Promedio</p>
-                  <p className="text-2xl font-bold text-purple-600">85%</p>
+                  <p className="text-sm text-gray-600">Estado</p>
+                  <p className="text-2xl font-bold text-purple-600">
+                    {userCourse ? 'Activo' : 'Inactivo'}
+                  </p>
                 </div>
                 <Target className="h-8 w-8 text-purple-600" />
               </div>
@@ -118,68 +264,84 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Learning Modules */}
+            {/* Learning Topics */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center">
                   <BookOpen className="h-5 w-5 mr-2 text-blue-600" />
-                  Módulos de Aprendizaje
+                  Temas de Aprendizaje
+                  {userCourse && (
+                    <Badge variant="outline" className="ml-2">
+                      {userCourse.nombreCurso}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">Fundamentos de Ciberseguridad</h3>
-                      <p className="text-sm text-gray-600">Conceptos básicos y principios fundamentales</p>
-                      <Progress value={100} className="mt-2 h-2" />
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      Completado
-                    </Badge>
+                {error && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    <p className="font-medium">Error:</p>
+                    <p>{error}</p>
                   </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">Gestión de Contraseñas</h3>
-                      <p className="text-sm text-gray-600">Mejores prácticas para contraseñas seguras</p>
-                      <Progress value={100} className="mt-2 h-2" />
-                    </div>
-                    <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      Completado
-                    </Badge>
+                )}
+                
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-500">Cargando temas del curso...</p>
                   </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">Phishing y Ingeniería Social</h3>
-                      <p className="text-sm text-gray-600">Identificación y prevención de ataques</p>
-                      <Progress value={75} className="mt-2 h-2" />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                        En Progreso
-                      </Badge>
-                      <Link href="/learning/phishing">
-                        <Button size="sm">Continuar</Button>
-                      </Link>
-                    </div>
+                ) : courseTopics.length > 0 ? (
+                  <div className="space-y-4">
+                    {courseTopics.map((topic, index) => (
+                      <div key={topic.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-gray-900">{topic.titulo}</h3>
+                          <p className="text-sm text-gray-600 line-clamp-2">
+                            {topic.contenido.length > 100 
+                              ? topic.contenido.substring(0, 100) + '...' 
+                              : topic.contenido.replace(/<[^>]*>/g, '') // Remover tags HTML si los hay
+                            }
+                          </p>
+                          <div className="flex items-center mt-2 space-x-2">
+                            <span className="text-xs text-gray-500">Tema {topic.orden}</span>
+                            <Progress value={index === 0 ? 75 : index < 2 ? 100 : 0} className="h-2 w-24" />
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          {index < 2 ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              Completado
+                            </Badge>
+                          ) : index === 2 ? (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              En Progreso
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline">Disponible</Badge>
+                          )}
+                          <Link href={`/learning/${topic.id}`}>
+                            <Button size="sm" variant={index < 2 ? "outline" : "default"}>
+                              <PlayCircle className="h-4 w-4 mr-1" />
+                              {index < 2 ? 'Revisar' : index === 2 ? 'Continuar' : 'Iniciar'}
+                            </Button>
+                          </Link>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-
-                  <div className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                    <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">Seguridad en Redes</h3>
-                      <p className="text-sm text-gray-600">Protección de redes y comunicaciones</p>
-                      <Progress value={0} className="mt-2 h-2" />
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="outline">Bloqueado</Badge>
-                      <Button size="sm" disabled>
-                        Iniciar
-                      </Button>
-                    </div>
+                ) : userCourse ? (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">No hay temas disponibles en este curso aún.</p>
+                    <p className="text-sm text-gray-400 mt-2">Los temas aparecerán aquí cuando el profesor los agregue.</p>
                   </div>
-                </div>
+                ) : (
+                  <div className="text-center py-8">
+                    <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-500">Sin curso asignado</p>
+                    <p className="text-sm text-gray-400 mt-2">Contacta a tu administrador para que te asigne un curso.</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -232,14 +394,36 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <p className="text-sm text-blue-800 font-medium">Practica más ejercicios de phishing</p>
-                    <p className="text-xs text-blue-600 mt-1">Basado en tu último desempeño</p>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <p className="text-sm text-green-800 font-medium">¡Excelente progreso!</p>
-                    <p className="text-xs text-green-600 mt-1">Mantén el ritmo de estudio</p>
-                  </div>
+                  {userCourse && courseTopics.length > 0 ? (
+                    <>
+                      <div className="p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-800 font-medium">
+                          Continúa con: {courseTopics[0]?.titulo || 'Próximo tema'}
+                        </p>
+                        <p className="text-xs text-blue-600 mt-1">Sigue tu progreso en el curso</p>
+                      </div>
+                      <div className="p-3 bg-green-50 rounded-lg">
+                        <p className="text-sm text-green-800 font-medium">¡Excelente progreso!</p>
+                        <p className="text-xs text-green-600 mt-1">
+                          {courseTopics.length} temas disponibles en tu curso
+                        </p>
+                      </div>
+                    </>
+                  ) : userCourse ? (
+                    <div className="p-3 bg-yellow-50 rounded-lg">
+                      <p className="text-sm text-yellow-800 font-medium">Curso sin contenido</p>
+                      <p className="text-xs text-yellow-600 mt-1">
+                        Tu profesor aún no ha agregado temas a este curso
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="p-3 bg-red-50 rounded-lg">
+                      <p className="text-sm text-red-800 font-medium">Sin curso asignado</p>
+                      <p className="text-xs text-red-600 mt-1">
+                        Contacta a tu administrador para obtener acceso a un curso
+                      </p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -249,27 +433,45 @@ export default function DashboardPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">Completaste la evaluación de "Gestión de Contraseñas"</p>
-                      <p className="text-xs text-gray-500">Hace 2 horas</p>
+                  {userCourse ? (
+                    <>
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">
+                            Te inscribiste en "{userCourse.nombreCurso}"
+                          </p>
+                          <p className="text-xs text-gray-500">Curso activo</p>
+                        </div>
+                      </div>
+                      {courseTopics.length > 0 && (
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <div className="flex-1">
+                            <p className="text-sm text-gray-900">
+                              {courseTopics.length} tema{courseTopics.length !== 1 ? 's' : ''} disponible{courseTopics.length !== 1 ? 's' : ''} para estudiar
+                            </p>
+                            <p className="text-xs text-gray-500">Temas del curso</p>
+                          </div>
+                        </div>
+                      )}
+                      <div className="flex items-center space-x-3">
+                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-900">Acceso al dashboard estudiantil habilitado</p>
+                          <p className="text-xs text-gray-500">Sistema listo</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                      <div className="flex-1">
+                        <p className="text-sm text-gray-900">Esperando asignación de curso</p>
+                        <p className="text-xs text-gray-500">Contacta a tu administrador</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">Iniciaste el módulo "Phishing y Ingeniería Social"</p>
-                      <p className="text-xs text-gray-500">Ayer</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-3">
-                    <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">Obtuviste 92% en la evaluación adaptativa</p>
-                      <p className="text-xs text-gray-500">Hace 3 días</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

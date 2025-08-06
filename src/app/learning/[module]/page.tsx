@@ -1,43 +1,161 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Shield, ArrowLeft, ArrowRight, BookOpen, Camera, Play, CheckCircle, AlertTriangle } from "lucide-react"
+import { Shield, ArrowLeft, ArrowRight, BookOpen, Camera, Play, CheckCircle, AlertTriangle, CameraOff } from "lucide-react"
 import Link from "next/link"
+import { topicAPI } from "@/lib/api"
+
+interface Topic {
+  id: number
+  titulo: string
+  contenido: string
+  contenido_formateado: string
+  curso: number
+  orden: number
+}
 
 export default function LearningModulePage() {
-  const [currentLesson, setCurrentLesson] = useState(0)
-  const [cameraEnabled, setCameraEnabled] = useState(true)
+  const params = useParams()
+  const router = useRouter()
+  const [topic, setTopic] = useState<Topic | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [cameraEnabled, setCameraEnabled] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const [cameraError, setCameraError] = useState("")
+  const [emotionalState, setEmotionalState] = useState("Analizando...")
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
-  const lessons = [
-    {
-      title: "¿Qué es el Phishing?",
-      content:
-        "El phishing es una técnica de ingeniería social utilizada para obtener información confidencial de forma fraudulenta...",
-      type: "theory",
-    },
-    {
-      title: "Tipos de Ataques de Phishing",
-      content: "Existen varios tipos de ataques de phishing, cada uno con características específicas...",
-      type: "theory",
-    },
-    {
-      title: "Identificación de Correos Maliciosos",
-      content: "Aprende a identificar las señales de alerta en correos electrónicos sospechosos...",
-      type: "interactive",
-    },
-    {
-      title: "Casos Prácticos",
-      content: "Analiza estos casos reales de intentos de phishing...",
-      type: "practice",
-    },
-  ]
+  // Cargar el tema cuando se monta el componente
+  useEffect(() => {
+    const loadTopic = async () => {
+      if (!params.module) return
+      
+      setIsLoading(true)
+      setError("")
+      
+      try {
+        const topicId = parseInt(params.module as string)
+        console.log('Cargando tema con ID:', topicId)
+        
+        const response = await topicAPI.getTopic(topicId)
+        console.log('Respuesta del tema:', response)
+        
+        if (response.ok) {
+          setTopic(response.data)
+          console.log('Tema cargado:', response.data)
+          // Activar automáticamente la cámara cuando se carga el tema
+          setTimeout(() => {
+            startCamera()
+          }, 1000) // Pequeño delay para asegurar que el componente esté montado
+        } else {
+          setError('Error al cargar el tema')
+          console.error('Error al cargar tema:', response)
+        }
+      } catch (error) {
+        console.error('Error de conexión:', error)
+        setError('Error de conexión al servidor')
+      } finally {
+        setIsLoading(false)
+      }
+    }
 
-  const toggleCamera = () => {
-    setCameraEnabled(!cameraEnabled)
+    loadTopic()
+  }, [params.module])
+
+  // Limpiar recursos cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop())
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [cameraStream])
+
+  // Función para iniciar la cámara
+  const startCamera = async () => {
+    try {
+      setCameraError("")
+      console.log('Solicitando acceso a la cámara...')
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: false 
+      })
+      
+      console.log('Cámara activada exitosamente')
+      setCameraStream(stream)
+      setCameraEnabled(true)
+      
+      // Asignar el stream al elemento video
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+      
+      // Simular análisis de emociones cada 3 segundos
+      intervalRef.current = setInterval(() => {
+        const emotions = ["Concentrado", "Curioso", "Interesado", "Reflexivo", "Atento"]
+        const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)]
+        setEmotionalState(randomEmotion)
+      }, 3000)
+      
+    } catch (err) {
+      console.error('Error al acceder a la cámara:', err)
+      setCameraError('No se pudo acceder a la cámara. Verifica los permisos.')
+      setCameraEnabled(false)
+    }
+  }
+
+  // Función para detener la cámara (solo cuando se sale del componente)
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop())
+      setCameraStream(null)
+    }
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    
+    setCameraEnabled(false)
+    setEmotionalState("Sesión finalizada")
+    console.log('Cámara desactivada - fin de sesión')
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando tema...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error || !topic) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <p className="text-red-600 mb-4">{error || 'Tema no encontrado'}</p>
+          <Button onClick={() => router.push('/dashboard')}>
+            Volver al Dashboard
+          </Button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -54,100 +172,110 @@ export default function LearningModulePage() {
             </Link>
             <div className="flex items-center space-x-2">
               <Shield className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">Phishing y Ingeniería Social</span>
+              <span className="text-xl font-bold text-gray-900">{topic.titulo}</span>
             </div>
           </div>
           <div className="flex items-center space-x-4">
             <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              Módulo 3
+              Tema {topic.orden}
             </Badge>
-            <Button
-              variant={cameraEnabled ? "default" : "outline"}
-              size="sm"
-              onClick={toggleCamera}
-              className={cameraEnabled ? "bg-green-600 hover:bg-green-700" : ""}
-            >
-              <Camera className="h-4 w-4 mr-2" />
-              {cameraEnabled ? "Cámara Activa" : "Activar Cámara"}
-            </Button>
+            <div className="flex items-center space-x-2">
+              {cameraEnabled ? (
+                <Badge className="bg-green-100 text-green-800">
+                  <Camera className="h-3 w-3 mr-1" />
+                  Cámara Activa
+                </Badge>
+              ) : (
+                <Badge className="bg-yellow-100 text-yellow-800">
+                  <Camera className="h-3 w-3 mr-1" />
+                  Activando Cámara...
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Sidebar - Lesson Navigation */}
+          {/* Sidebar - Camera Status */}
           <div className="lg:col-span-1">
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Lecciones</CardTitle>
-                <Progress value={((currentLesson + 1) / lessons.length) * 100} className="h-2" />
-                <p className="text-sm text-gray-600">
-                  {currentLesson + 1} de {lessons.length} lecciones
-                </p>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                {lessons.map((lesson, index) => (
-                  <div
-                    key={index}
-                    className={`p-3 rounded-lg cursor-pointer transition-colors ${
-                      index === currentLesson
-                        ? "bg-blue-100 border-blue-300 border"
-                        : index < currentLesson
-                          ? "bg-green-50 hover:bg-green-100"
-                          : "bg-gray-50 hover:bg-gray-100"
-                    }`}
-                    onClick={() => setCurrentLesson(index)}
-                  >
-                    <div className="flex items-center space-x-2">
-                      {index < currentLesson ? (
-                        <CheckCircle className="h-4 w-4 text-green-600" />
-                      ) : index === currentLesson ? (
-                        <Play className="h-4 w-4 text-blue-600" />
-                      ) : (
-                        <div className="h-4 w-4 border-2 border-gray-300 rounded-full" />
-                      )}
-                      <span
-                        className={`text-sm ${
-                          index === currentLesson ? "font-semibold text-blue-900" : "text-gray-700"
-                        }`}
-                      >
-                        {lesson.title}
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Camera Status */}
-            {cameraEnabled && (
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center">
+                <CardTitle className="text-lg flex items-center">
+                  {cameraEnabled ? (
                     <Camera className="h-5 w-5 mr-2 text-green-600" />
-                    Estado de Cámara
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="w-full h-32 bg-gray-200 rounded-lg flex items-center justify-center">
-                      <div className="text-center">
-                        <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Vista previa de cámara</p>
+                  ) : (
+                    <CameraOff className="h-5 w-5 mr-2 text-gray-400" />
+                  )}
+                  Estado de Cámara
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {/* Video preview - Ahora más grande */}
+                  <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden relative">
+                    {cameraEnabled && cameraStream ? (
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <Camera className="h-12 w-12 text-blue-400 mx-auto mb-2 animate-pulse" />
+                          <p className="text-sm text-gray-600 font-medium">
+                            Iniciando cámara...
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Para continuar con el tema
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Camera error */}
+                  {cameraError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        {cameraError}
+                      </div>
+                      <p className="mt-1 text-xs">
+                        Actualiza la página y permite el acceso a la cámara para continuar.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Emotional state */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Estado emocional:</span>
+                    <Badge className={`${
+                      cameraEnabled 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {emotionalState}
+                    </Badge>
+                  </div>
+                  
+                  {/* Status info */}
+                  <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border">
+                    <div className="flex items-start space-x-2">
+                      <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-blue-800 mb-1">Monitoreo de Aprendizaje</p>
+                        <p>La cámara permanecerá activa durante todo el tema para analizar tu atención y mejorar la experiencia de aprendizaje.</p>
                       </div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-600">Estado emocional:</span>
-                      <Badge className="bg-green-100 text-green-800">Concentrado</Badge>
-                    </div>
-                    <div className="text-xs text-gray-500">
-                      La cámara analiza tu estado emocional para adaptar el contenido
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Main Content */}
@@ -155,89 +283,38 @@ export default function LearningModulePage() {
             <Card className="min-h-[600px]">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-2xl">{lessons[currentLesson].title}</CardTitle>
+                  <CardTitle className="text-2xl">{topic.titulo}</CardTitle>
                   <Badge variant="outline">
-                    {lessons[currentLesson].type === "theory" && <BookOpen className="h-4 w-4 mr-1" />}
-                    {lessons[currentLesson].type === "interactive" && <Play className="h-4 w-4 mr-1" />}
-                    {lessons[currentLesson].type === "practice" && <AlertTriangle className="h-4 w-4 mr-1" />}
-                    {lessons[currentLesson].type.charAt(0).toUpperCase() + lessons[currentLesson].type.slice(1)}
+                    <BookOpen className="h-4 w-4 mr-1" />
+                    Tema
                   </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="prose max-w-none">
-                  <p className="text-gray-700 leading-relaxed">{lessons[currentLesson].content}</p>
-                </div>
-
-                {/* Interactive Content Based on Lesson Type */}
-                {lessons[currentLesson].type === "theory" && (
-                  <div className="bg-blue-50 p-6 rounded-lg">
-                    <h3 className="font-semibold text-blue-900 mb-3">Puntos Clave:</h3>
-                    <ul className="space-y-2 text-blue-800">
-                      <li>• Los atacantes se hacen pasar por entidades confiables</li>
-                      <li>• Buscan obtener información personal o financiera</li>
-                      <li>• Utilizan técnicas de persuasión psicológica</li>
-                      <li>• Pueden llegar por email, SMS, llamadas o sitios web</li>
-                    </ul>
-                  </div>
-                )}
-
-                {lessons[currentLesson].type === "interactive" && (
-                  <div className="bg-yellow-50 p-6 rounded-lg">
-                    <h3 className="font-semibold text-yellow-900 mb-3">Ejercicio Interactivo:</h3>
-                    <div className="space-y-4">
-                      <div className="bg-white p-4 rounded border">
-                        <p className="text-sm text-gray-600 mb-2">Ejemplo de correo sospechoso:</p>
-                        <div className="bg-gray-100 p-3 rounded text-sm">
-                          <p>
-                            <strong>De:</strong> seguridad@bancoxyz.com
-                          </p>
-                          <p>
-                            <strong>Asunto:</strong> URGENTE: Verificar su cuenta
-                          </p>
-                          <p className="mt-2">Su cuenta será suspendida. Haga clic aquí para verificar...</p>
-                        </div>
-                      </div>
-                      <Button className="bg-yellow-600 hover:bg-yellow-700">Analizar Correo</Button>
-                    </div>
-                  </div>
-                )}
-
-                {lessons[currentLesson].type === "practice" && (
-                  <div className="bg-red-50 p-6 rounded-lg">
-                    <h3 className="font-semibold text-red-900 mb-3">Caso Práctico:</h3>
-                    <div className="space-y-4">
-                      <p className="text-red-800">Analiza este caso real y identifica las señales de alerta...</p>
-                      <Button className="bg-red-600 hover:bg-red-700">Comenzar Análisis</Button>
-                    </div>
-                  </div>
-                )}
+                {/* Contenido del tema en HTML */}
+                <div 
+                  className="prose max-w-none"
+                  dangerouslySetInnerHTML={{ __html: topic.contenido_formateado }}
+                />
 
                 {/* Navigation */}
                 <div className="flex justify-between items-center pt-6 border-t">
                   <Button
                     variant="outline"
-                    onClick={() => setCurrentLesson(Math.max(0, currentLesson - 1))}
-                    disabled={currentLesson === 0}
+                    onClick={() => router.push('/dashboard')}
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
-                    Anterior
+                    Volver al Dashboard
                   </Button>
 
                   <div className="flex space-x-2">
-                    {currentLesson === lessons.length - 1 ? (
-                      <Link href="/evaluation/phishing">
-                        <Button className="bg-green-600 hover:bg-green-700">
-                          Ir a Evaluación
-                          <ArrowRight className="h-4 w-4 ml-2" />
-                        </Button>
-                      </Link>
-                    ) : (
-                      <Button onClick={() => setCurrentLesson(Math.min(lessons.length - 1, currentLesson + 1))}>
-                        Siguiente
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    )}
+                    <Button 
+                      className="bg-green-600 hover:bg-green-700"
+                      onClick={() => router.push(`/evaluation/${topic.id}`)}
+                    >
+                      Tomar Evaluación
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </Button>
                   </div>
                 </div>
               </CardContent>
