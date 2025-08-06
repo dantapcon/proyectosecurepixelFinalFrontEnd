@@ -20,6 +20,13 @@ export const API_ENDPOINTS = {
   TOPIC_DETAIL: (topicId: number) => `${API_BASE_URL}/api/ensennanza/temas/${topicId}/`,
   NEXT_TOPIC: `${API_BASE_URL}/api/ensennanza/temas/siguiente/`,
   
+  // Pruebas/Evaluaciones
+  CREATE_PRUEBA: `${API_BASE_URL}/api/preguntas/crear-prueba/`,
+  GET_PRUEBA: (pruebaId: number) => `${API_BASE_URL}/api/preguntas/prueba/${pruebaId}/`,
+  RESPOND_PRUEBA: (pruebaId: number) => `${API_BASE_URL}/api/preguntas/prueba/${pruebaId}/responder/`,
+  LIST_PRUEBAS: `${API_BASE_URL}/api/preguntas/listar-pruebas/`,
+  PRUEBA_DETAIL: (pruebaId: number) => `${API_BASE_URL}/api/preguntas/detalle-prueba/${pruebaId}/`,
+  
   // Enseñanza y preguntas (para futuras implementaciones)
   TEACHING: `${API_BASE_URL}/api/ensennanza/`,
   QUESTIONS: `${API_BASE_URL}/api/preguntas/`,
@@ -235,6 +242,46 @@ export const topicAPI = {
   // Obtener siguiente tema
   getNextTopic: async () => {
     return apiRequest(API_ENDPOINTS.NEXT_TOPIC, {
+      method: 'GET',
+    })
+  },
+}
+
+// API para Pruebas/Evaluaciones
+export const pruebaAPI = {
+  // Crear nueva prueba
+  createPrueba: async (pruebaData: any) => {
+    return apiRequest(API_ENDPOINTS.CREATE_PRUEBA, {
+      method: 'POST',
+      body: JSON.stringify(pruebaData),
+    })
+  },
+
+  // Obtener prueba con preguntas por ID de tema
+  getPruebaByTema: async (temaId: number) => {
+    return apiRequest(API_ENDPOINTS.GET_PRUEBA(temaId), {
+      method: 'GET',
+    })
+  },
+
+  // Responder prueba
+  responderPrueba: async (pruebaId: number, respuestas: any) => {
+    return apiRequest(API_ENDPOINTS.RESPOND_PRUEBA(pruebaId), {
+      method: 'POST',
+      body: JSON.stringify(respuestas),
+    })
+  },
+
+  // Listar todas las pruebas
+  getAllPruebas: async () => {
+    return apiRequest(API_ENDPOINTS.LIST_PRUEBAS, {
+      method: 'GET',
+    })
+  },
+
+  // Obtener detalle de prueba
+  getPruebaDetail: async (pruebaId: number) => {
+    return apiRequest(API_ENDPOINTS.PRUEBA_DETAIL(pruebaId), {
       method: 'GET',
     })
   },
