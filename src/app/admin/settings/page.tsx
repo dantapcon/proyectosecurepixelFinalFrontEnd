@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { 
   Shield, 
   Users, 
@@ -20,7 +21,7 @@ import {
   LogOut 
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
-import { apiRequest, API_ENDPOINTS } from "@/lib/api"
+import { apiRequest, API_ENDPOINTS, courseAPI } from "@/lib/api"
 
 // Types actualizados para coincidir con el backend
 interface User {
@@ -34,6 +35,15 @@ interface User {
   is_superuser?: boolean
   tipo_usuario?: string
   date_joined: string
+  curso?: number
+}
+
+interface Course {
+  id: number
+  nombreCurso: string
+  profesor: number
+  dificultadMinima: number
+  dificultadMaxima: number
 }
 
 interface EditUserForm {
@@ -42,10 +52,12 @@ interface EditUserForm {
   email: string
   username: string
   tipo_usuario: string
+  curso?: number
 }
 
 export default function AdminSettingsPage() {
   const [users, setUsers] = useState<User[]>([])
+  const [courses, setCourses] = useState<Course[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedTab, setSelectedTab] = useState("all")
@@ -57,7 +69,8 @@ export default function AdminSettingsPage() {
     last_name: "",
     email: "",
     username: "",
-    tipo_usuario: "alumno"
+    tipo_usuario: "alumno",
+    curso: undefined
   })
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [hasToken, setHasToken] = useState(false)
@@ -86,12 +99,41 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     if (user) {
       console.log('Usuario autenticado:', user)
-      loadUsers()
+      loadUsersAndCourses()
     } else {
       console.log('No hay usuario autenticado, redirigiendo...')
       router.push('/login')
     }
   }, [user, router])
+
+  // Función para cargar usuarios y cursos
+  const loadUsersAndCourses = async () => {
+    await Promise.all([
+      loadUsers(),
+      loadCourses()
+    ])
+  }
+
+  // Cargar cursos disponibles
+  const loadCourses = async () => {
+    try {
+      console.log('Cargando cursos...')
+      const response = await courseAPI.getAllCourses()
+      console.log('Respuesta de cursos:', response)
+      
+      if (response.ok) {
+        console.log('Cursos cargados:', response.data)
+        const coursesData = Array.isArray(response.data) ? response.data : []
+        setCourses(coursesData)
+      } else {
+        console.error('Error al cargar cursos:', response)
+        setCourses([])
+      }
+    } catch (error) {
+      console.error('Error loading courses:', error)
+      setCourses([])
+    }
+  }
 
   // Filtrar usuarios cuando cambia el término de búsqueda o la pestaña
   useEffect(() => {
@@ -183,7 +225,8 @@ export default function AdminSettingsPage() {
       last_name: user.last_name,
       email: user.email,
       username: user.username,
-      tipo_usuario: getUserType(user)
+      tipo_usuario: getUserType(user),
+      curso: user.curso || undefined
     })
   }
 
@@ -194,22 +237,40 @@ export default function AdminSettingsPage() {
     try {
       console.log('Guardando usuario:', editingUser.id, editForm)
       
+      // Preparar los datos para enviar
+      const updateData: any = {
+        username: editForm.username,
+        email: editForm.email,
+        first_name: editForm.first_name,
+        last_name: editForm.last_name,
+        tipo_usuario: editForm.tipo_usuario,
+      }
+      
+      // Solo agregar curso si es un estudiante y tiene un curso seleccionado
+      if (editForm.tipo_usuario === 'alumno' && editForm.curso) {
+        updateData.curso = editForm.curso
+      }
+      
+      console.log('Datos a enviar al backend:', updateData)
+      console.log('Curso seleccionado:', editForm.curso)
+      console.log('Tipo de usuario:', editForm.tipo_usuario)
+      
       const response = await apiRequest(API_ENDPOINTS.UPDATE_USER(editingUser.id), {
         method: 'PUT',
-        body: JSON.stringify({
-          ...editForm
-        })
+        body: JSON.stringify(updateData)
       })
 
       console.log('Respuesta de actualizar usuario:', response)
 
       if (response.ok) {
-        await loadUsers() // Recargar la lista
+        console.log('Usuario actualizado exitosamente, recargando datos...')
+        await loadUsersAndCourses() // Recargar tanto usuarios como cursos
         setEditingUser(null)
         setError("")
+        console.log('Datos recargados')
       } else {
         console.error('Error al actualizar usuario:', response)
-        setError(response.data.message || 'Error al actualizar usuario')
+        setError(response.data?.message || 'Error al actualizar usuario')
       }
     } catch (error) {
       console.error('Error de conexión al actualizar usuario:', error)
@@ -226,7 +287,8 @@ export default function AdminSettingsPage() {
       last_name: "",
       email: "",
       username: "",
-      tipo_usuario: "alumno"
+      tipo_usuario: "alumno",
+      curso: undefined
     })
   }
 
@@ -251,6 +313,13 @@ export default function AdminSettingsPage() {
     } else {
       return <Badge className="bg-green-100 text-green-800">Estudiante</Badge>
     }
+  }
+
+  // Función para obtener el nombre del curso
+  const getCourseName = (courseId: number | undefined) => {
+    if (!courseId) return "Sin curso asignado"
+    const course = courses.find(c => c.id === courseId)
+    return course ? course.nombreCurso : "Curso no encontrado"
   }
 
   const getTabCounts = () => {
@@ -412,6 +481,7 @@ export default function AdminSettingsPage() {
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Usuario</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Tipo</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Curso</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Acciones</th>
                         </tr>
                       </thead>
@@ -461,7 +531,9 @@ export default function AdminSettingsPage() {
                                     const value = e.target.value
                                     setEditForm({
                                       ...editForm,
-                                      tipo_usuario: value
+                                      tipo_usuario: value,
+                                      // Limpiar curso si cambia a profesor o administrador
+                                      curso: value === 'alumno' ? editForm.curso : undefined
                                     })
                                   }}
                                   className="text-sm border border-gray-300 rounded px-2 py-1"
@@ -473,6 +545,40 @@ export default function AdminSettingsPage() {
                                 </select>
                               ) : (
                                 getUserTypeBadge(user)
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {editingUser?.id === user.id ? (
+                                editForm.tipo_usuario === 'alumno' ? (
+                                  <select
+                                    value={editForm.curso || ''}
+                                    onChange={(e) => {
+                                      const value = e.target.value
+                                      setEditForm({
+                                        ...editForm,
+                                        curso: value ? parseInt(value) : undefined
+                                      })
+                                    }}
+                                    className="text-sm border border-gray-300 rounded px-2 py-1 w-full"
+                                  >
+                                    <option value="">-- Sin curso asignado --</option>
+                                    {courses.map(course => (
+                                      <option key={course.id} value={course.id}>
+                                        {course.nombreCurso}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <span className="text-sm text-gray-500">
+                                    {editForm.tipo_usuario === 'profesor' ? 'Se asigna al crear curso' : 'No aplica'}
+                                  </span>
+                                )
+                              ) : (
+                                <span className="text-sm">
+                                  {getUserType(user) === 'alumno' ? getCourseName(user.curso) : (
+                                    getUserType(user) === 'profesor' ? 'Se asigna al crear curso' : 'No aplica'
+                                  )}
+                                </span>
                               )}
                             </td>
                             <td className="py-3 px-4">
