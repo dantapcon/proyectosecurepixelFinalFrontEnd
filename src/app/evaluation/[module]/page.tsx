@@ -329,11 +329,7 @@ export default function EvaluationPage() {
                           className="flex-1 cursor-pointer text-gray-700 leading-relaxed"
                         >
                           {respuesta.texto}
-                          {respuesta.ia && (
-                            <Badge variant="outline" className="ml-2 text-xs bg-purple-50 text-purple-600 border-purple-200">
-                              IA
-                            </Badge>
-                          )}
+                          
                         </Label>
                       </div>
                     ))}
