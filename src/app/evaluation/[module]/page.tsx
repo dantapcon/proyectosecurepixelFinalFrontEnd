@@ -207,7 +207,7 @@ export default function EvaluationPage() {
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg">
                   <div className="text-2xl font-bold text-green-600">
-                    {resultados.porcentaje || 0}%
+                    {resultados.calificacion || 0}
                   </div>
                   <div className="text-sm text-gray-600">Calificación</div>
                 </div>

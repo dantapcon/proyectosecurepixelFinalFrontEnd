@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Shield, ArrowLeft, ArrowRight, BookOpen, Camera, Play, CheckCircle, AlertTriangle, CameraOff } from "lucide-react"
 import Link from "next/link"
 import { topicAPI } from "@/lib/api"
+import { apiRequest, API_ENDPOINTS, pruebaAPI} from "@/lib/api"
 
 interface Topic {
   id: number
@@ -308,13 +309,24 @@ export default function LearningModulePage() {
                   </Button>
 
                   <div className="flex space-x-2">
-                    <Button 
+                    <Button
                       className="bg-green-600 hover:bg-green-700"
-                      onClick={() => router.push(`/evaluation/${topic.id}`)}
+                      onClick={async () => {
+                      try {
+                        // Usa pruebaAPI.createPrueba para crear la prueba
+                        const res = await pruebaAPI.createPrueba({ tema_id: topic.id })
+                        if (!res.ok) throw new Error('No se pudo crear la prueba')
+                        // Redirige a la evaluación con la pk de la prueba creada
+                        router.push(`/evaluation/${res.data.id}`)
+                      } catch (e) {
+                        alert('Error al crear la prueba')
+                      }
+                      }}
                     >
                       Tomar Evaluación
                       <ArrowRight className="h-4 w-4 ml-2" />
                     </Button>
+
                   </div>
                 </div>
               </CardContent>
