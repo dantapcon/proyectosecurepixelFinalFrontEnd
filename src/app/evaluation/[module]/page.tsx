@@ -155,8 +155,11 @@ export default function EvaluationPage() {
 
     try {
       console.log('Enviando imagen para análisis de emociones...')
-      const response = await emotionAPI.processImage(base64Image)
-      
+     
+      // El valor de prueba?.id puede ser diferente al del módulo, así que usamos params.module
+      // Si params.module es string, lo convertimos a number
+      const temaId = parseInt(params.module as string)
+      const response = await emotionAPI.processImage(base64Image, temaId)      
       if (response.ok) {
         console.log('Análisis de emociones recibido:', response.data)
         setRealEmotions(response.data)

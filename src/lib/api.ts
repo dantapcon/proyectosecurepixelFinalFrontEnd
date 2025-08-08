@@ -30,8 +30,8 @@ export const API_ENDPOINTS = {
   PRUEBA_DETAIL: (pruebaId: number) => `${API_BASE_URL}/api/preguntas/detalle-prueba/${pruebaId}/`,
   
   // Análisis de emociones
-  ATENCION: `${API_BASE_URL}/api/analisis/atencion`,
-  EMOCIONES: `${API_BASE_URL}/api/analisis/emociones`,
+  ATENCION: `${API_BASE_URL}/api/ia/atencion`,
+  EMOCIONES: (pruebaId: number) =>`${API_BASE_URL}/api/ia/emociones/${pruebaId}/`,
   
   // Enseñanza y preguntas (para futuras implementaciones)
   TEACHING: `${API_BASE_URL}/api/ensennanza/`,
@@ -296,8 +296,8 @@ export const pruebaAPI = {
 // API de análisis de emociones
 export const emotionAPI = {
   // Procesar imagen para análisis de emociones
-  processImage: async (base64Image: string) => {
-    return apiRequest(API_ENDPOINTS.EMOCIONES, {
+  processImage: async (base64Image: string,pruebaId: number) => {
+    return apiRequest(API_ENDPOINTS.EMOCIONES(pruebaId), {
       method: 'POST',
       body: JSON.stringify({
         image: base64Image
