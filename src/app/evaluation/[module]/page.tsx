@@ -236,56 +236,66 @@ export default function EvaluationPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Shield className="h-6 w-6 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Resultados de la Evaluación</span>
+                <span className="text-xl font-bold text-gray-900">Resultados de Evaluación</span>
               </div>
             </div>
-            <Button onClick={() => router.push('/dashboard')}>
-              Volver al Dashboard
-            </Button>
+            <Badge variant="secondary" className="bg-green-100 text-green-800">
+              <CheckCircle className="h-3 w-3 mr-1" />
+              Completada
+            </Badge>
           </div>
         </header>
 
         <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-2xl">¡Evaluación Completada!</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
-                    <CheckCircle className="h-8 w-8 text-blue-600 mx-auto mb-2" />
-                    <p className="font-semibold text-blue-900">Puntaje</p>
-                    <p className="text-2xl font-bold text-blue-700">{resultados.puntaje}/{resultados.total_preguntas}</p>
+          <Card className="max-w-2xl mx-auto">
+            <CardHeader className="text-center">
+              <CardTitle className="text-2xl text-green-600">¡Evaluación Completada!</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-2 gap-4 text-center">
+                <div className="bg-blue-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">
+                    {resultados.respuestas_correctas || 0}/{prueba?.preguntas.length || 0}
                   </div>
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
-                    <Clock className="h-8 w-8 text-green-600 mx-auto mb-2" />
-                    <p className="font-semibold text-green-900">Tiempo</p>
-                    <p className="text-2xl font-bold text-green-700">{Math.round(resultados.tiempo_total / 60)} min</p>
-                  </div>
-                  <div className="text-center p-4 bg-purple-50 rounded-lg">
-                    <FileText className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-                    <p className="font-semibold text-purple-900">Precisión</p>
-                    <p className="text-2xl font-bold text-purple-700">
-                      {Math.round((resultados.puntaje / resultados.total_preguntas) * 100)}%
-                    </p>
-                  </div>
+                  <div className="text-sm text-gray-600">Respuestas Correctas</div>
                 </div>
+                <div className="bg-green-50 p-4 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">
+                    {resultados.calificacion || 0}
+                  </div>
+                  <div className="text-sm text-gray-600">Calificación</div>
+                </div>
+              </div>
 
+              <div className="text-center space-y-4">
+                <p className="text-gray-600">
+                  {resultados.aprobado 
+                    ? "¡Felicitaciones! Has aprobado la evaluación." 
+                    : "No has alcanzado la calificación mínima. Te recomendamos revisar el tema nuevamente."
+                  }
+                </p>
+                
                 <div className="flex justify-center space-x-4">
-                  <Button onClick={() => router.push('/dashboard')}>
+                  <Button
+                    variant="outline"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    <ArrowLeft className="h-4 w-4 mr-2" />
                     Volver al Dashboard
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => router.push(`/results/${resultados.id}`)}
-                  >
-                    Ver Detalles
-                  </Button>
+                  
+                  {!resultados.aprobado && (
+                    <Button
+                      onClick={() => router.push(`/learning/${params.module}`)}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      Revisar Tema
+                    </Button>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
