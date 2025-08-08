@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { Shield, ArrowLeft, CheckCircle, AlertTriangle, Clock, FileText, Camera, CameraOff } from "lucide-react"
 import Link from "next/link"
-import { pruebaAPI } from "@/lib/api"
+import { pruebaAPI, emotionAPI } from "@/lib/api"
 
 interface Respuesta {
   id: number
@@ -48,8 +48,11 @@ export default function EvaluationPage() {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
   const [cameraError, setCameraError] = useState("")
   const [emotionalState, setEmotionalState] = useState("Analizando...")
+  const [realEmotions, setRealEmotions] = useState<any>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
   const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const emotionIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cargar la prueba cuando se monta el componente
   useEffect(() => {
@@ -97,8 +100,74 @@ export default function EvaluationPage() {
       if (intervalRef.current) {
         clearInterval(intervalRef.current)
       }
+      if (emotionIntervalRef.current) {
+        clearInterval(emotionIntervalRef.current)
+      }
     }
   }, [cameraStream])
+
+  // Función para capturar frame del video y convertirlo a base64
+  const captureFrame = (): string | null => {
+    if (!videoRef.current || !canvasRef.current) return null
+
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+
+    if (!ctx || video.videoWidth === 0 || video.videoHeight === 0) return null
+
+    // Configurar canvas a 240x240
+    canvas.width = 240
+    canvas.height = 240
+
+    // Calcular dimensiones para mantener aspect ratio y centrar
+    const videoAspect = video.videoWidth / video.videoHeight
+    let sourceWidth = video.videoWidth
+    let sourceHeight = video.videoHeight
+    let sourceX = 0
+    let sourceY = 0
+
+    if (videoAspect > 1) {
+      // Video es más ancho que alto
+      sourceWidth = video.videoHeight
+      sourceX = (video.videoWidth - sourceWidth) / 2
+    } else {
+      // Video es más alto que ancho
+      sourceHeight = video.videoWidth
+      sourceY = (video.videoHeight - sourceHeight) / 2
+    }
+
+    // Dibujar el frame en el canvas
+    ctx.drawImage(
+      video,
+      sourceX, sourceY, sourceWidth, sourceHeight,
+      0, 0, 240, 240
+    )
+
+    // Convertir a base64
+    return canvas.toDataURL('image/jpeg', 0.8)
+  }
+
+  // Función para procesar imagen con el backend
+  const processEmotionAnalysis = async () => {
+    const base64Image = captureFrame()
+    if (!base64Image) return
+
+    try {
+      console.log('Enviando imagen para análisis de emociones...')
+      const response = await emotionAPI.processImage(base64Image)
+      
+      if (response.ok) {
+        console.log('Análisis de emociones recibido:', response.data)
+        setRealEmotions(response.data)
+        setEmotionalState(response.data.emocion_predicha || "Analizando...")
+      } else {
+        console.error('Error en análisis de emociones:', response)
+      }
+    } catch (error) {
+      console.error('Error al procesar análisis de emociones:', error)
+    }
+  }
 
   // Función para iniciar la cámara
   const startCamera = async () => {
@@ -121,12 +190,18 @@ export default function EvaluationPage() {
         videoRef.current.play()
       }
       
-      // Simular análisis de emociones cada 3 segundos
-      intervalRef.current = setInterval(() => {
-        const emotions = ["Concentrado", "Evaluando", "Pensativo", "Reflexivo", "Atento"]
-        const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)]
-        setEmotionalState(randomEmotion)
-      }, 3000)
+      // Esperar un momento para que el video esté listo
+      setTimeout(() => {
+        // Iniciar análisis de emociones cada 3 segundos
+        emotionIntervalRef.current = setInterval(() => {
+          processEmotionAnalysis()
+        }, 3000)
+        
+        // Primera captura después de 2 segundos
+        setTimeout(() => {
+          processEmotionAnalysis()
+        }, 2000)
+      }, 1000)
       
     } catch (err) {
       console.error('Error al acceder a la cámara:', err)
@@ -145,6 +220,11 @@ export default function EvaluationPage() {
     if (intervalRef.current) {
       clearInterval(intervalRef.current)
       intervalRef.current = null
+    }
+    
+    if (emotionIntervalRef.current) {
+      clearInterval(emotionIntervalRef.current)
+      emotionIntervalRef.current = null
     }
     
     setCameraEnabled(false)
@@ -354,6 +434,14 @@ export default function EvaluationPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
+                  {/* Canvas oculto para captura de frames */}
+                  <canvas 
+                    ref={canvasRef} 
+                    style={{ display: 'none' }} 
+                    width={240} 
+                    height={240}
+                  />
+                  
                   {/* Video preview */}
                   <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden relative">
                     {cameraEnabled && cameraStream ? (
@@ -403,6 +491,21 @@ export default function EvaluationPage() {
                       {emotionalState}
                     </Badge>
                   </div>
+
+                  {/* Análisis detallado de emociones */}
+                  {realEmotions && realEmotions.emociones && (
+                    <div className="text-xs">
+                      <p className="font-medium text-gray-700 mb-2">Análisis IA:</p>
+                      <div className="space-y-1 max-h-24 overflow-y-auto">
+                        {realEmotions.emociones.slice(0, 3).map((emocion: any, index: number) => (
+                          <div key={index} className="flex justify-between items-center">
+                            <span className="text-gray-600">{emocion[0]}</span>
+                            <span className="text-gray-800 font-medium">{emocion[1].toFixed(1)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Status info */}
                   <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border">

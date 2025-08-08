@@ -29,6 +29,10 @@ export const API_ENDPOINTS = {
   LIST_PRUEBAS: `${API_BASE_URL}/api/preguntas/listar-pruebas/`,
   PRUEBA_DETAIL: (pruebaId: number) => `${API_BASE_URL}/api/preguntas/detalle-prueba/${pruebaId}/`,
   
+  // Análisis de emociones
+  ATENCION: `${API_BASE_URL}/api/analisis/atencion`,
+  EMOCIONES: `${API_BASE_URL}/api/analisis/emociones`,
+  
   // Enseñanza y preguntas (para futuras implementaciones)
   TEACHING: `${API_BASE_URL}/api/ensennanza/`,
   QUESTIONS: `${API_BASE_URL}/api/preguntas/`,
@@ -285,6 +289,27 @@ export const pruebaAPI = {
   getPruebaDetail: async (pruebaId: number) => {
     return apiRequest(API_ENDPOINTS.PRUEBA_DETAIL(pruebaId), {
       method: 'GET',
+    })
+  },
+}
+
+// API de análisis de emociones
+export const emotionAPI = {
+  // Procesar imagen para análisis de emociones
+  processImage: async (base64Image: string) => {
+    return apiRequest(API_ENDPOINTS.EMOCIONES, {
+      method: 'POST',
+      body: JSON.stringify({
+        image: base64Image
+      }),
+    })
+  },
+
+  // Análisis de atención (para futuras implementaciones)
+  analyzeAttention: async (data: any) => {
+    return apiRequest(API_ENDPOINTS.ATENCION, {
+      method: 'POST',
+      body: JSON.stringify(data),
     })
   },
 }
