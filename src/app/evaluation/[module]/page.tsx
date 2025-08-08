@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
-import { Shield, ArrowLeft, CheckCircle, AlertTriangle, Clock, FileText } from "lucide-react"
+import { Shield, ArrowLeft, CheckCircle, AlertTriangle, Clock, FileText, Camera, CameraOff } from "lucide-react"
 import Link from "next/link"
 import { pruebaAPI } from "@/lib/api"
 
@@ -42,6 +42,14 @@ export default function EvaluationPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showResults, setShowResults] = useState(false)
   const [resultados, setResultados] = useState<any>(null)
+  
+  // Estados para la cámara
+  const [cameraEnabled, setCameraEnabled] = useState(false)
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null)
+  const [cameraError, setCameraError] = useState("")
+  const [emotionalState, setEmotionalState] = useState("Analizando...")
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
 
   // Cargar la prueba cuando se monta el componente
   useEffect(() => {
@@ -61,6 +69,10 @@ export default function EvaluationPage() {
         if (response.ok) {
           setPrueba(response.data)
           console.log('Prueba cargada:', response.data)
+          // Activar automáticamente la cámara cuando se carga la prueba
+          setTimeout(() => {
+            startCamera()
+          }, 1000) // Pequeño delay para asegurar que el componente esté montado
         } else {
           setError('Error al cargar la evaluación')
           console.error('Error al cargar prueba:', response)
@@ -76,7 +88,71 @@ export default function EvaluationPage() {
     loadPrueba()
   }, [params.module])
 
-  // Manejar selección de respuesta
+  // Limpiar recursos cuando el componente se desmonta
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop())
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [cameraStream])
+
+  // Función para iniciar la cámara
+  const startCamera = async () => {
+    try {
+      setCameraError("")
+      console.log('Solicitando acceso a la cámara...')
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: true, 
+        audio: false 
+      })
+      
+      console.log('Cámara activada exitosamente')
+      setCameraStream(stream)
+      setCameraEnabled(true)
+      
+      // Asignar el stream al elemento video
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        videoRef.current.play()
+      }
+      
+      // Simular análisis de emociones cada 3 segundos
+      intervalRef.current = setInterval(() => {
+        const emotions = ["Concentrado", "Evaluando", "Pensativo", "Reflexivo", "Atento"]
+        const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)]
+        setEmotionalState(randomEmotion)
+      }, 3000)
+      
+    } catch (err) {
+      console.error('Error al acceder a la cámara:', err)
+      setCameraError('No se pudo acceder a la cámara. Verifica los permisos.')
+      setCameraEnabled(false)
+    }
+  }
+
+  // Función para detener la cámara (solo cuando se sale del componente)
+  const stopCamera = () => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop())
+      setCameraStream(null)
+    }
+    
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    
+    setCameraEnabled(false)
+    setEmotionalState("Sesión finalizada")
+    console.log('Cámara desactivada - fin de sesión')
+  }
+
+  // Funciones para manejar las respuestas
   const handleRespuestaChange = (preguntaId: number, respuestaId: number) => {
     setRespuestasSeleccionadas(prev => ({
       ...prev,
@@ -84,71 +160,47 @@ export default function EvaluationPage() {
     }))
   }
 
-  // Enviar evaluación
-  const handleSubmitEvaluacion = async () => {
+  // Función para enviar las respuestas
+  const handleSubmit = async () => {
     if (!prueba) return
 
-    // Verificar que todas las preguntas estén respondidas
+    // Verificar que todas las preguntas tengan respuesta
     const preguntasSinResponder = prueba.preguntas.filter(p => !respuestasSeleccionadas[p.id])
     if (preguntasSinResponder.length > 0) {
-      setError(`Por favor responde todas las preguntas. Faltan ${preguntasSinResponder.length} pregunta(s).`)
+      alert(`Faltan ${preguntasSinResponder.length} preguntas por responder`)
       return
     }
 
     setIsSubmitting(true)
-    setError("")
-
+    
     try {
-      const tiempoTotal = Math.round((Date.now() - tiempoInicio) / 1000) // en segundos
+      const tiempoTotal = Math.round((Date.now() - tiempoInicio) / 1000)
       
-      const respuestasEnvio = {
+      const response = await pruebaAPI.responderPrueba(prueba.id, {
         respuestas: Object.entries(respuestasSeleccionadas).map(([preguntaId, respuestaId]) => ({
           pregunta_id: parseInt(preguntaId),
           respuesta_id: respuestaId
         })),
         tiempo_total: tiempoTotal
-      }
+      })
 
-      console.log('Enviando respuestas:', respuestasEnvio)
-      
-      const response = await pruebaAPI.responderPrueba(prueba.id, respuestasEnvio)
-      console.log('Respuesta del servidor:', response)
-      
       if (response.ok) {
         setResultados(response.data)
         setShowResults(true)
+        // Detener la cámara al finalizar la evaluación
+        stopCamera()
       } else {
-        setError('Error al enviar la evaluación')
-        console.error('Error al enviar evaluación:', response)
+        alert('Error al enviar las respuestas')
       }
     } catch (error) {
-      console.error('Error al enviar evaluación:', error)
-      setError('Error de conexión al enviar la evaluación')
+      console.error('Error al enviar respuestas:', error)
+      alert('Error de conexión al enviar las respuestas')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  // Calcular tiempo transcurrido
-  const getTiempoTranscurrido = () => {
-    const tiempoTranscurrido = Math.round((Date.now() - tiempoInicio) / 1000)
-    const minutos = Math.floor(tiempoTranscurrido / 60)
-    const segundos = tiempoTranscurrido % 60
-    return `${minutos.toString().padStart(2, '0')}:${segundos.toString().padStart(2, '0')}`
-  }
-
-  // Actualizar el tiempo cada segundo
-  useEffect(() => {
-    if (showResults) return
-    
-    const interval = setInterval(() => {
-      // Force re-render to update time display
-      setError(prev => prev) // Trigger re-render for time update
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [showResults])
-
+  // Pantalla de carga
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
@@ -160,12 +212,13 @@ export default function EvaluationPage() {
     )
   }
 
-  if (error && !prueba) {
+  // Pantalla de error
+  if (error || !prueba) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
         <div className="text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <p className="text-red-600 mb-4">{error}</p>
+          <p className="text-red-600 mb-4">{error || 'Evaluación no encontrada'}</p>
           <Button onClick={() => router.push('/dashboard')}>
             Volver al Dashboard
           </Button>
@@ -174,6 +227,7 @@ export default function EvaluationPage() {
     )
   }
 
+  // Pantalla de resultados
   if (showResults && resultados) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
@@ -182,85 +236,62 @@ export default function EvaluationPage() {
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
                 <Shield className="h-6 w-6 text-blue-600" />
-                <span className="text-xl font-bold text-gray-900">Resultados de Evaluación</span>
+                <span className="text-xl font-bold text-gray-900">Resultados de la Evaluación</span>
               </div>
             </div>
-            <Badge variant="secondary" className="bg-green-100 text-green-800">
-              <CheckCircle className="h-3 w-3 mr-1" />
-              Completada
-            </Badge>
+            <Button onClick={() => router.push('/dashboard')}>
+              Volver al Dashboard
+            </Button>
           </div>
         </header>
 
         <div className="container mx-auto px-4 py-8">
-          <Card className="max-w-2xl mx-auto">
-            <CardHeader className="text-center">
-              <CardTitle className="text-2xl text-green-600">¡Evaluación Completada!</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid grid-cols-2 gap-4 text-center">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {resultados.respuestas_correctas || 0}/{prueba?.preguntas.length || 0}
+          <div className="max-w-4xl mx-auto">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-2xl">¡Evaluación Completada!</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                    <CheckCircle className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                    <p className="font-semibold text-blue-900">Puntaje</p>
+                    <p className="text-2xl font-bold text-blue-700">{resultados.puntaje}/{resultados.total_preguntas}</p>
                   </div>
-                  <div className="text-sm text-gray-600">Respuestas Correctas</div>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600">
-                    {resultados.calificacion || 0}
+                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                    <Clock className="h-8 w-8 text-green-600 mx-auto mb-2" />
+                    <p className="font-semibold text-green-900">Tiempo</p>
+                    <p className="text-2xl font-bold text-green-700">{Math.round(resultados.tiempo_total / 60)} min</p>
                   </div>
-                  <div className="text-sm text-gray-600">Calificación</div>
+                  <div className="text-center p-4 bg-purple-50 rounded-lg">
+                    <FileText className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+                    <p className="font-semibold text-purple-900">Precisión</p>
+                    <p className="text-2xl font-bold text-purple-700">
+                      {Math.round((resultados.puntaje / resultados.total_preguntas) * 100)}%
+                    </p>
+                  </div>
                 </div>
-              </div>
 
-              <div className="text-center space-y-4">
-                <p className="text-gray-600">
-                  {resultados.aprobado 
-                    ? "¡Felicitaciones! Has aprobado la evaluación." 
-                    : "No has alcanzado la calificación mínima. Te recomendamos revisar el tema nuevamente."
-                  }
-                </p>
-                
                 <div className="flex justify-center space-x-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push('/dashboard')}
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
+                  <Button onClick={() => router.push('/dashboard')}>
                     Volver al Dashboard
                   </Button>
-                  
-                  {!resultados.aprobado && (
-                    <Button
-                      onClick={() => router.push(`/learning/${params.module}`)}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      Revisar Tema
-                    </Button>
-                  )}
+                  <Button 
+                    variant="outline" 
+                    onClick={() => router.push(`/results/${resultados.id}`)}
+                  >
+                    Ver Detalles
+                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     )
   }
 
-  if (!prueba) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
-        <div className="text-center">
-          <AlertTriangle className="h-12 w-12 text-orange-500 mx-auto mb-4" />
-          <p className="text-gray-600 mb-4">No se encontró evaluación para este tema</p>
-          <Button onClick={() => router.push('/dashboard')}>
-            Volver al Dashboard
-          </Button>
-        </div>
-      </div>
-    )
-  }
-
+  // Pantalla principal de evaluación
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
       {/* Header */}
@@ -275,104 +306,180 @@ export default function EvaluationPage() {
             </Link>
             <div className="flex items-center space-x-2">
               <Shield className="h-6 w-6 text-blue-600" />
-              <span className="text-xl font-bold text-gray-900">Evaluación</span>
+              <span className="text-xl font-bold text-gray-900">Evaluación en Progreso</span>
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-              <FileText className="h-3 w-3 mr-1" />
-              {prueba?.preguntas.length || 0} Preguntas
-            </Badge>
-            <Badge variant="outline" className="bg-yellow-50 text-yellow-800 border-yellow-200">
-              <Clock className="h-3 w-3 mr-1" />
-              {getTiempoTranscurrido()}
-            </Badge>
+            <div className="flex items-center space-x-2">
+              {cameraEnabled ? (
+                <Badge className="bg-green-100 text-green-800">
+                  <Camera className="h-3 w-3 mr-1" />
+                  Cámara Activa
+                </Badge>
+              ) : (
+                <Badge className="bg-yellow-100 text-yellow-800">
+                  <Camera className="h-3 w-3 mr-1" />
+                  Activando Cámara...
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
       </header>
 
       <div className="container mx-auto px-4 py-8">
-        <Card className="max-w-4xl mx-auto">
-          <CardHeader>
-            <CardTitle className="text-2xl">Evaluación del Tema</CardTitle>
-            <p className="text-gray-600">
-              Responde todas las preguntas y presiona "Enviar Evaluación" cuando termines.
-            </p>
-            {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
-                <div className="flex items-center">
-                  <AlertTriangle className="h-5 w-5 mr-2" />
-                  {error}
-                </div>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-8">
-            {prueba?.preguntas.map((pregunta: Pregunta, index: number) => (
-              <div key={pregunta.id} className="border-b pb-6 last:border-b-0">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
-                    {index + 1}. {pregunta.texto}
-                  </h3>
-                </div>
-
-                <RadioGroup
-                  value={respuestasSeleccionadas[pregunta.id]?.toString() || ""}
-                  onValueChange={(value) => handleRespuestaChange(pregunta.id, parseInt(value))}
-                >
-                  <div className="space-y-3">
-                    {pregunta.respuestas.map((respuesta: Respuesta) => (
-                      <div key={respuesta.id} className="flex items-center space-x-3 p-3 rounded-lg hover:bg-gray-50 transition-colors">
-                        <RadioGroupItem value={respuesta.id.toString()} id={`respuesta-${respuesta.id}`} />
-                        <Label 
-                          htmlFor={`respuesta-${respuesta.id}`} 
-                          className="flex-1 cursor-pointer text-gray-700 leading-relaxed"
-                        >
-                          {respuesta.texto}
-                          
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                </RadioGroup>
-              </div>
-            )) || []}
-
-            {/* Botones de navegación */}
-            <div className="flex justify-between items-center pt-6 border-t">
-              <Button
-                variant="outline"
-                onClick={() => router.push(`/learning/${params.module}`)}
-              >
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                Volver al Tema
-              </Button>
-
-              <div className="flex items-center space-x-4">
-                <div className="text-sm text-gray-600">
-                  {Object.keys(respuestasSeleccionadas).length} de {prueba?.preguntas.length || 0} respondidas
-                </div>
-                <Button
-                  onClick={handleSubmitEvaluacion}
-                  disabled={isSubmitting || Object.keys(respuestasSeleccionadas).length !== (prueba?.preguntas.length || 0)}
-                  className="bg-green-600 hover:bg-green-700"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Enviando...
-                    </>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Sidebar - Camera Status */}
+          <div className="lg:col-span-1">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center">
+                  {cameraEnabled ? (
+                    <Camera className="h-5 w-5 mr-2 text-green-600" />
                   ) : (
-                    <>
-                      <CheckCircle className="h-4 w-4 mr-2" />
-                      Enviar Evaluación
-                    </>
+                    <CameraOff className="h-5 w-5 mr-2 text-gray-400" />
                   )}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  Estado de Cámara
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {/* Video preview */}
+                  <div className="w-full h-48 bg-gray-200 rounded-lg overflow-hidden relative">
+                    {cameraEnabled && cameraStream ? (
+                      <video
+                        ref={videoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <Camera className="h-12 w-12 text-blue-400 mx-auto mb-2 animate-pulse" />
+                          <p className="text-sm text-gray-600 font-medium">
+                            Iniciando cámara...
+                          </p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Para monitorear la evaluación
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Camera error */}
+                  {cameraError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
+                      <div className="flex items-center">
+                        <AlertTriangle className="h-4 w-4 mr-2" />
+                        {cameraError}
+                      </div>
+                      <p className="mt-1 text-xs">
+                        Actualiza la página y permite el acceso a la cámara.
+                      </p>
+                    </div>
+                  )}
+                  
+                  {/* Emotional state */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">Estado emocional:</span>
+                    <Badge className={`${
+                      cameraEnabled 
+                        ? "bg-green-100 text-green-800" 
+                        : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {emotionalState}
+                    </Badge>
+                  </div>
+                  
+                  {/* Status info */}
+                  <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded border">
+                    <div className="flex items-start space-x-2">
+                      <Shield className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-blue-800 mb-1">Monitoreo de Evaluación</p>
+                        <p>La cámara permanecerá activa durante toda la evaluación para garantizar la integridad del proceso.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <Card className="min-h-[600px]">
+              <CardHeader>
+                <CardTitle className="text-2xl">Evaluación</CardTitle>
+                <p className="text-gray-600">
+                  Responde todas las preguntas y haz clic en "Enviar Evaluación" al finalizar.
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                {/* Preguntas */}
+                <div className="space-y-6">
+                  {prueba.preguntas.map((pregunta, index) => (
+                    <div key={pregunta.id} className="border rounded-lg p-6">
+                      <h3 className="text-lg font-medium text-gray-900 mb-4">
+                        {index + 1}. {pregunta.texto}
+                      </h3>
+                      
+                      <RadioGroup 
+                        value={respuestasSeleccionadas[pregunta.id]?.toString() || ""} 
+                        onValueChange={(value) => handleRespuestaChange(pregunta.id, parseInt(value))}
+                      >
+                        <div className="space-y-3">
+                          {pregunta.respuestas.map((respuesta) => (
+                            <div 
+                              key={respuesta.id} 
+                              className="flex items-center space-x-3 p-3 border rounded hover:bg-gray-50 transition-colors"
+                            >
+                              <RadioGroupItem value={respuesta.id.toString()} id={`respuesta-${respuesta.id}`} />
+                              <Label 
+                                htmlFor={`respuesta-${respuesta.id}`} 
+                                className="flex-1 cursor-pointer text-gray-700"
+                              >
+                                {respuesta.texto}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                      </RadioGroup>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Botón de envío */}
+                <div className="flex justify-between items-center pt-6 border-t">
+                  <div className="text-sm text-gray-600">
+                    Preguntas respondidas: {Object.keys(respuestasSeleccionadas).length}/{prueba.preguntas.length}
+                  </div>
+                  
+                  <Button 
+                    onClick={handleSubmit}
+                    disabled={isSubmitting || Object.keys(respuestasSeleccionadas).length !== prueba.preguntas.length}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="h-4 w-4 mr-2" />
+                        Enviar Evaluación
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   )
