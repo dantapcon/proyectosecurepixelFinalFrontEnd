@@ -40,7 +40,7 @@ export default function EmotionTracker({
         tiempoLectura,
       };
       const blob = new Blob([JSON.stringify(datos)], { type: 'application/json' });
-      const sent = navigator.sendBeacon('http://localhost:8090/api/ia/atencion', blob);
+      const sent = navigator.sendBeacon('http://localhost:8000/api/ia/atencion', blob);
       if (sent) console.log('✅ Atención enviada con sendBeacon');
       else console.warn('⚠️ sendBeacon no pudo enviar los datos');
     } catch (err) {
