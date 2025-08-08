@@ -60,7 +60,7 @@ export default function EmotionTracker({
         tiempoLectura,
       };
 
-      fetch('http://localhost:8090/api/ia/atencion', {
+      fetch('http://localhost:8000/api/ia/atencion', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(datos),
