@@ -1,6 +1,8 @@
 // Configuración de la API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+
+//comentario prueva
 export const API_ENDPOINTS = {
   // Usuarios
   REGISTER: `${API_BASE_URL}/api/usuarios/register`,
