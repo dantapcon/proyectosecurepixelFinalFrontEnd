@@ -21,7 +21,7 @@ import {
   LogOut 
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
-import { apiRequest, API_ENDPOINTS, courseAPI } from "@/lib/api"
+import { apiRequest, API_ENDPOINTS, courseAPI, userAPI } from "@/lib/api"
 
 // Types actualizados para coincidir con el backend
 interface User {
@@ -53,6 +53,7 @@ interface EditUserForm {
   username: string
   tipo_usuario: string
   curso?: number
+  new_password?: string
 }
 
 export default function AdminSettingsPage() {
@@ -70,7 +71,8 @@ export default function AdminSettingsPage() {
     email: "",
     username: "",
     tipo_usuario: "alumno",
-    curso: undefined
+    curso: undefined,
+    new_password: ""
   })
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [hasToken, setHasToken] = useState(false)
@@ -226,7 +228,8 @@ export default function AdminSettingsPage() {
       email: user.email,
       username: user.username,
       tipo_usuario: getUserType(user),
-      curso: user.curso || undefined
+      curso: user.curso || undefined,
+      new_password: ""
     })
   }
 
@@ -262,12 +265,35 @@ export default function AdminSettingsPage() {
 
       console.log('Respuesta de actualizar usuario:', response)
 
+      // Si se proporcionó una nueva contraseña, cambiarla por separado
+      if (response.ok && editForm.new_password && editForm.new_password.trim()) {
+        console.log('Cambiando contraseña del usuario...')
+        
+        const passwordResponse = await userAPI.changePassword(editingUser.id, editForm.new_password)
+
+        console.log('Respuesta de cambiar contraseña:', passwordResponse)
+        
+        if (!passwordResponse.ok) {
+          console.error('Error al cambiar contraseña:', passwordResponse)
+          setError(passwordResponse.data?.message || 'Error al cambiar la contraseña')
+          setIsLoading(false)
+          return
+        }
+      }
+
       if (response.ok) {
         console.log('Usuario actualizado exitosamente, recargando datos...')
         await loadUsersAndCourses() // Recargar tanto usuarios como cursos
         setEditingUser(null)
         setError("")
         console.log('Datos recargados')
+        
+        // Mensaje de éxito
+        if (editForm.new_password && editForm.new_password.trim()) {
+          alert('Usuario y contraseña actualizados exitosamente')
+        } else {
+          alert('Usuario actualizado exitosamente')
+        }
       } else {
         console.error('Error al actualizar usuario:', response)
         setError(response.data?.message || 'Error al actualizar usuario')
@@ -288,7 +314,8 @@ export default function AdminSettingsPage() {
       email: "",
       username: "",
       tipo_usuario: "alumno",
-      curso: undefined
+      curso: undefined,
+      new_password: ""
     })
   }
 
@@ -482,6 +509,7 @@ export default function AdminSettingsPage() {
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Email</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Tipo</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Curso</th>
+                          <th className="text-left py-3 px-4 font-medium text-gray-900">Nueva Contraseña</th>
                           <th className="text-left py-3 px-4 font-medium text-gray-900">Acciones</th>
                         </tr>
                       </thead>
@@ -579,6 +607,19 @@ export default function AdminSettingsPage() {
                                     getUserType(user) === 'profesor' ? 'Se asigna al crear curso' : 'No aplica'
                                   )}
                                 </span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              {editingUser?.id === user.id ? (
+                                <Input
+                                  type="password"
+                                  value={editForm.new_password || ''}
+                                  onChange={(e) => setEditForm({...editForm, new_password: e.target.value})}
+                                  placeholder="Nueva contraseña (opcional)"
+                                  className="text-sm"
+                                />
+                              ) : (
+                                <span className="text-sm text-gray-500">••••••••</span>
                               )}
                             </td>
                             <td className="py-3 px-4">

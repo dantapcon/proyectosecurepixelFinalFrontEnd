@@ -158,10 +158,12 @@ export const userAPI = {
     })
   },
 
-  changePassword: async (userId: number, passwordData: any) => {
+  changePassword: async (userId: number, nuevaContrasena: string) => {
     return apiRequest(API_ENDPOINTS.CHANGE_PASSWORD(userId), {
       method: 'PUT',
-      body: JSON.stringify(passwordData),
+      body: JSON.stringify({
+        nueva_contrasena: nuevaContrasena
+      }),
     })
   },
 }
