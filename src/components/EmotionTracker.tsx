@@ -96,16 +96,16 @@ const EmotionTracker = forwardRef(function EmotionTracker({
   // Enviar con sendBeacon
 const enviarAtencion = async () => {
   try {
-    const tiempoFinal = inicioAnalisisRef.current 
+    const tiempoFinal = inicioAnalisisRef.current
       ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
       : tiempoTotalRef.current;
 
     const datos = {
       tema: topicId,
-      Usuario: userId, // 🔹 añadido
+      Usuario: userId,
       fecha: new Date().toISOString(),
-      vectorOjosCerrados: vectorOjosCerradosRef.current, // 🔹 corregido
-      vectorAnguloCabeza: vectorAnguloCabezaRef.current,
+      vectorOjosCerrados: vectorOjosCerradosRef , // <-- aquí
+      vectorAnguloCabeza: vectorAnguloCabezaRef,  // <-- y aquí
       tiempoLectura: tiempoFinal,
     };
 

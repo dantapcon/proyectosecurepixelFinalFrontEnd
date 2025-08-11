@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import { topicAPI, pruebaAPI } from "@/lib/api";
 import EmotionTracker from "@/components/EmotionTracker";
-
+import { useAuth } from "@/contexts/AuthContext"
 interface Topic {
   id: number;
   titulo: string;
@@ -43,7 +43,7 @@ export default function LearningModulePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-
+  const user  = useAuth()
   // Cargar el tema cuando se monta el componente
   useEffect(() => {
     const loadTopic = async () => {
@@ -286,7 +286,7 @@ export default function LearningModulePage() {
                           ref={emotionTrackerRef}  
                           active={cameraEnabled}
                           topicId={topic.id}
-                          userId={1} // Cambiar según contexto real fcvbfcb gvbfcgvbfcfcgv
+                          userId={user.user.id} // Cambiar según contexto real fcvbfcb gvbfcgvbfcfcgv
                           tiempoLectura={tiempoLectura}
                           onEmotionChange={(emotion) => setEmotionalState(emotion)}
                         />
