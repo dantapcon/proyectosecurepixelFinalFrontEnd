@@ -1,10 +1,7 @@
 'use client';
 
-import React, { useEffect, useRef } from 'react';
-import {
-  FaceLandmarker,
-  FilesetResolver,
-} from '@mediapipe/tasks-vision';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { FaceLandmarker, FilesetResolver} from '@mediapipe/tasks-vision';
 
 interface EmotionTrackerProps {
   active: boolean;
@@ -14,13 +11,13 @@ interface EmotionTrackerProps {
   onEmotionChange?: (emotion: string) => void;
 }
 
-export default function EmotionTracker({
+const EmotionTracker = forwardRef(function EmotionTracker({
   active,
   topicId,
   userId,
   tiempoLectura,
   onEmotionChange,
-}: EmotionTrackerProps) {
+}: EmotionTrackerProps,ref) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const faceLandmarkerRef = useRef<FaceLandmarker | null>(null);
@@ -97,60 +94,43 @@ export default function EmotionTracker({
   };
 
   // Enviar con sendBeacon
-  const enviarAtencionBeacon = () => {
-    try {
-      const tiempoFinal = inicioAnalisisRef.current 
-        ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
-        : tiempoTotalRef.current;
+const enviarAtencion = async () => {
+  try {
+    const tiempoFinal = inicioAnalisisRef.current 
+      ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
+      : tiempoTotalRef.current;
 
-      const datos = {
-        tema: topicId,
-        Usuario: userId, // 🔹 añadido
-        fecha: new Date().toISOString(),
-        vectorOjosCerrados: vectorOjosCerradosRef.current, // 🔹 corregido el typo
-        vectorAnguloCabeza: vectorAnguloCabezaRef.current,
-        tiempoLectura: tiempoFinal,
-      };
-      
-      console.log(' Datos finales a enviar:', datos);
-      
-      const blob = new Blob([JSON.stringify(datos)], { type: 'application/json' });
-      navigator.sendBeacon('http://localhost:8000/api/ia/atencion', blob);
-    } catch (err) {
-      console.error('❌ Error enviando atención con sendBeacon:', err);
+    const datos = {
+      tema: topicId,
+      Usuario: userId, // 🔹 añadido
+      fecha: new Date().toISOString(),
+      vectorOjosCerrados: vectorOjosCerradosRef.current, // 🔹 corregido
+      vectorAnguloCabeza: vectorAnguloCabezaRef.current,
+      tiempoLectura: tiempoFinal,
+    };
+
+    console.log("Datos finales a enviar:", datos);
+
+    const response = await fetch("http://localhost:8000/api/ia/atencion", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(datos),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Error en la petición: ${response.status}`);
     }
-  };
 
-  // Enviar con fetch + keepalive
-  const enviarAtencionFetchKeepalive = () => {
-    try {
-      const tiempoFinal = inicioAnalisisRef.current 
-        ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
-        : tiempoTotalRef.current;
-
-      const datos = {
-        tema: topicId,
-        usuario: userId,
-        usuario_id: userId, // 🔹 añadido
-        fecha: new Date().toISOString(),
-        vectorOjosCerrados: vectorOjosCerradosRef.current, // 🔹 corregido el typo
-        vectorAnguloCabeza: vectorAnguloCabezaRef.current,
-        tiempoLectura: tiempoFinal,
-        tiempoAnalisis: tiempoFinal
-      };
-
-      fetch('http://localhost:8000/api/ia/atencion', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(datos),
-        keepalive: true,
-      })
-        .then(() => console.log('✅ Atención enviada con fetch (keepalive)'))
-        .catch((err) => console.error('❌ Error enviando atención con fetch:', err));
-    } catch (err) {
-      console.error('❌ Error preparando fetch:', err);
-    }
-  };
+    console.log("✅ Datos enviados correctamente");
+  } catch (err) {
+    console.error("❌ Error enviando atención:", err);
+  }
+};
+useImperativeHandle(ref, () => ({
+    enviarAtencion,
+  }));
 
   // Limpiar recursos
   const limpiarRecursos = () => {
@@ -288,9 +268,7 @@ export default function EmotionTracker({
       if (inicioAnalisisRef.current) {
         tiempoTotalRef.current = (Date.now() - inicioAnalisisRef.current.getTime()) / 1000;
       }
-      limpiarRecursos();
-      enviarAtencionBeacon();
-      enviarAtencionFetchKeepalive();
+      limpiarRecursos(); 
     };
   }, [active, topicId, userId]);
 
@@ -313,6 +291,9 @@ export default function EmotionTracker({
         <div>Ángulos &gt; 48°: {vectorAnguloCabezaRef.current.length}</div>
         <div>Tiempo: {inicioAnalisisRef.current ? Math.floor((Date.now() - inicioAnalisisRef.current.getTime()) / 1000) : 0}s</div>
       </div>
+      
     </div>
   );
-}
+});
+
+export default EmotionTracker;

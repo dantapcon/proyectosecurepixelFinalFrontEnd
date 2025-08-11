@@ -161,10 +161,14 @@ export default function LearningModulePage() {
       router.push("/dashboard");
     }, 100);
   };
-
+  const emotionTrackerRef = useRef(null);
   // Manejo para ir a evaluación, crea prueba y redirige
   const handleGoToEvaluation = async () => {
     stopCamera();
+    console.log('Ref actual:', emotionTrackerRef.current);
+    if (emotionTrackerRef.current) {
+      emotionTrackerRef.current.enviarAtencion();
+    }
     try {
       if (!topic) return;
       // Crear prueba vía API
@@ -279,9 +283,10 @@ export default function LearningModulePage() {
                     {cameraEnabled && topic && (
                       <div className="absolute inset-0">
                         <EmotionTracker
+                          ref={emotionTrackerRef}  
                           active={cameraEnabled}
                           topicId={topic.id}
-                          userId={1} // Cambiar según contexto real
+                          userId={1} // Cambiar según contexto real fcvbfcb gvbfcgvbfcfcgv
                           tiempoLectura={tiempoLectura}
                           onEmotionChange={(emotion) => setEmotionalState(emotion)}
                         />
