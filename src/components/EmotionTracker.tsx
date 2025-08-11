@@ -24,61 +24,170 @@ const EmotionTracker = forwardRef(function EmotionTracker({
   const runningRef = useRef<boolean>(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Vectores de eventos
+  // Vectores de eventos - MODIFICADO: ahora guardamos timestamps exactos
   const vectorOjosCerradosRef = useRef<string[]>([]);
   const vectorAnguloCabezaRef = useRef<string[]>([]);
   const inicioAnalisisRef = useRef<Date | null>(null);
   const tiempoTotalRef = useRef<number>(0);
   
-  // Estado de los ojos
-  const estadoOjosRef = useRef<{ abiertos: boolean; umbralParpadeo: number }>({
+  // Estado mejorado de los ojos con calibración automática
+  const estadoOjosRef = useRef<{ 
+    abiertos: boolean; 
+    umbralParpadeo: number;
+    historialEAR: number[];
+    calibrando: boolean;
+    umbralAdaptativo: number;
+  }>({
     abiertos: true,
-    umbralParpadeo: 0.3
+    umbralParpadeo: 0.25,
+    historialEAR: [],
+    calibrando: true,
+    umbralAdaptativo: 0.20
   });
   
   // Último ángulo de cabeza
   const ultimoAnguloRef = useRef<{ pitch: number; yaw: number; roll: number } | null>(null);
 
+  // FUNCIÓN MODIFICADA: Formato específico H:M:S:MS
   const obtenerHoraActual = (): string => {
-    return new Date().toLocaleTimeString('es-ES', { 
-      hour12: false, 
-      hour: '2-digit', 
-      minute: '2-digit', 
-      second: '2-digit',
-      fractionalSecondDigits: 3
-    });
+    const now = new Date();
+    const horas = now.getHours();
+    const minutos = now.getMinutes();
+    const segundos = now.getSeconds();
+    const milisegundos = Math.floor(now.getMilliseconds() / 10); // Solo 2 dígitos de ms
+    
+    // Formato: H:M:S:MS (sin ceros a la izquierda como pediste)
+    return `${horas}:${minutos}:${segundos}:${milisegundos.toString().padStart(2, '0')}`;
   };
 
-  // Detectar parpadeo mejorado
+  // NUEVA FUNCIÓN: Obtener tiempo relativo desde el inicio
+  const obtenerTiempoRelativo = (): string => {
+    if (!inicioAnalisisRef.current) return "0:0:0:00";
+    
+    const transcurrido = Date.now() - inicioAnalisisRef.current.getTime();
+    const horas = Math.floor(transcurrido / 3600000);
+    const minutos = Math.floor((transcurrido % 3600000) / 60000);
+    const segundos = Math.floor((transcurrido % 60000) / 1000);
+    const centisegundos = Math.floor((transcurrido % 1000) / 10);
+    
+    return `${horas}:${minutos}:${segundos}:${centisegundos.toString().padStart(2, '0')}`;
+  };
+
+  // Calcular EAR (Eye Aspect Ratio) - Método más robusto
+  const calcularEAR = (landmarks: any) => {
+    if (!landmarks || landmarks.length === 0) return null;
+
+    const faceLandmarks = landmarks[0];
+    
+    // Puntos del ojo izquierdo (6 puntos)
+    const ojoIzq = [
+      faceLandmarks[33],  // esquina externa
+      faceLandmarks[160], // punto superior 1
+      faceLandmarks[158], // punto superior 2  
+      faceLandmarks[133], // esquina interna
+      faceLandmarks[153], // punto inferior 2
+      faceLandmarks[144]  // punto inferior 1
+    ];
+    
+    // Puntos del ojo derecho (6 puntos)
+    const ojoDer = [
+      faceLandmarks[362], // esquina externa
+      faceLandmarks[385], // punto superior 1
+      faceLandmarks[387], // punto superior 2
+      faceLandmarks[263], // esquina interna  
+      faceLandmarks[373], // punto inferior 2
+      faceLandmarks[380]  // punto inferior 1
+    ];
+
+    // Verificar que todos los puntos existen
+    const puntosValidos = [...ojoIzq, ...ojoDer].every(punto => punto && punto.x !== undefined && punto.y !== undefined);
+    if (!puntosValidos) {
+      console.log("❌ Algunos landmarks de ojos no están disponibles");
+      return null;
+    }
+
+    // Calcular EAR para ojo izquierdo
+    const earIzq = calcularEARPorOjo(ojoIzq);
+    // Calcular EAR para ojo derecho  
+    const earDer = calcularEARPorOjo(ojoDer);
+
+    // Promedio de ambos ojos
+    return (earIzq + earDer) / 2;
+  };
+
+  const calcularEARPorOjo = (puntosOjo: any[]) => {
+    // Distancias verticales
+    const vertical1 = Math.sqrt(
+      Math.pow(puntosOjo[1].x - puntosOjo[5].x, 2) + 
+      Math.pow(puntosOjo[1].y - puntosOjo[5].y, 2)
+    );
+    const vertical2 = Math.sqrt(
+      Math.pow(puntosOjo[2].x - puntosOjo[4].x, 2) + 
+      Math.pow(puntosOjo[2].y - puntosOjo[4].y, 2)
+    );
+    
+    // Distancia horizontal
+    const horizontal = Math.sqrt(
+      Math.pow(puntosOjo[0].x - puntosOjo[3].x, 2) + 
+      Math.pow(puntosOjo[0].y - puntosOjo[3].y, 2)
+    );
+    
+    return (vertical1 + vertical2) / (2 * horizontal);
+  };
+
+  // Calibración automática del umbral
+  const calibrarUmbral = (ear: number) => {
+    if (!estadoOjosRef.current.calibrando) return;
+    
+    estadoOjosRef.current.historialEAR.push(ear);
+    
+    // Después de 60 muestras (aproximadamente 2-3 segundos), calcular umbral
+    if (estadoOjosRef.current.historialEAR.length >= 60) {
+      const promedioEAR = estadoOjosRef.current.historialEAR.reduce((a, b) => a + b, 0) / estadoOjosRef.current.historialEAR.length;
+      // El umbral es aproximadamente 70% del EAR promedio cuando los ojos están abiertos
+      estadoOjosRef.current.umbralAdaptativo = promedioEAR * 0.7;
+      estadoOjosRef.current.calibrando = false;
+      console.log(`🔧 Calibración completada. EAR promedio: ${promedioEAR.toFixed(4)}, Umbral: ${estadoOjosRef.current.umbralAdaptativo.toFixed(4)}`);
+    }
+  };
+
+  // FUNCIÓN MODIFICADA: Detectar parpadeo con timestamp preciso
   const detectarParpadeo = (landmarks: any) => {
-  if (!landmarks || landmarks.length === 0) return;
+    const ear = calcularEAR(landmarks);
+    if (ear === null) return;
 
-  const faceLandmarks = landmarks[0];
-  const ojoIzqSuperior = faceLandmarks[145];
-  const ojoIzqInferior = faceLandmarks[159];
-  const ojoDerSuperior = faceLandmarks[374];
-  const ojoDerInferior = faceLandmarks[386];
+    // Fase de calibración
+    if (estadoOjosRef.current.calibrando) {
+      calibrarUmbral(ear);
+      return;
+    }
 
-  if (!ojoIzqSuperior || !ojoIzqInferior || !ojoDerSuperior || !ojoDerInferior) return;
+    const umbralActual = estadoOjosRef.current.umbralAdaptativo;
+    const ojosAbiertos = ear > umbralActual;
 
-  const distanciaIzq = Math.abs(ojoIzqSuperior.y - ojoIzqInferior.y);
-  const distanciaDer = Math.abs(ojoDerSuperior.y - ojoDerInferior.y);
-  const promedioDistancia = (distanciaIzq + distanciaDer) / 2;
+    // 🔍 DEBUG: Log detallado (puedes comentar después de calibrar)
+    console.log(`👁️ EAR: ${ear.toFixed(4)}, Umbral: ${umbralActual.toFixed(4)}, Ojos: ${ojosAbiertos ? 'ABIERTOS' : 'CERRADOS'}`);
 
-  const ojosAbiertos = promedioDistancia > estadoOjosRef.current.umbralParpadeo;
+    // Detecta transición de abierto -> cerrado (parpadeo)
+    if (estadoOjosRef.current.abiertos && !ojosAbiertos) {
+      // MODIFICADO: Guardamos tanto hora absoluta como tiempo relativo
+      const horaAbsoluta = obtenerHoraActual();
+      const tiempoRelativo = obtenerTiempoRelativo();
+      
+      // Puedes elegir cuál usar: hora absoluta o tiempo relativo desde el inicio
+      vectorOjosCerradosRef.current.push(tiempoRelativo); // Usando tiempo relativo
+      
+      console.log(`👁️ ¡PARPADEO DETECTADO!`);
+      console.log(`   Hora absoluta: ${horaAbsoluta}`);
+      console.log(`   Tiempo relativo: ${tiempoRelativo}`);
+      console.log(`   EAR: ${ear.toFixed(4)}`);
+      console.log(`   Total parpadeos: ${vectorOjosCerradosRef.current.length}`);
+    }
 
-  // Detecta solo transición de abierto -> cerrado y evita duplicados en frames consecutivos
-  if (estadoOjosRef.current.abiertos && !ojosAbiertos) {
-    const horaParpadeo = obtenerHoraActual();
-    vectorOjosCerradosRef.current.push(horaParpadeo);
-    console.log(`👁️ Parpadeo detectado a las: ${horaParpadeo}`);
-  }
+    estadoOjosRef.current.abiertos = ojosAbiertos;
+  };
 
-  estadoOjosRef.current.abiertos = ojosAbiertos;
-};
-
-
-  // Detectar ángulo excesivo
+  // Detectar ángulo excesivo (SIN timestamps - solo conteo)
   const detectarAnguloExcesivo = (pitch: number, yaw: number, roll: number) => {
     const umbralAngulo = 48;
     const anguloExcesivo = 
@@ -93,42 +202,52 @@ const EmotionTracker = forwardRef(function EmotionTracker({
     }
   };
 
-  // Enviar con sendBeacon
-const enviarAtencion = async () => {
-  try {
-    const tiempoFinal = inicioAnalisisRef.current
-      ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
-      : tiempoTotalRef.current;
+  // FUNCIÓN MODIFICADA: Enviar con datos mejorados
+  const enviarAtencion = async () => {
+    try {
+      const tiempoFinal = inicioAnalisisRef.current
+        ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
+        : tiempoTotalRef.current;
 
-    const datos = {
-      tema: topicId,
-      Usuario: userId,
-      fecha: new Date().toISOString(),
-      vectorOjosCerrados: vectorOjosCerradosRef , // <-- aquí
-      vectorAnguloCabeza: vectorAnguloCabezaRef,  // <-- y aquí
-      tiempoLectura: tiempoFinal,
-    };
+      const datos = {
+        tema: topicId,
+        Usuario: userId,
+        fecha: new Date().toISOString(),
+        // SOLO vectorOjosCerrados tiene timestamps, vectorAnguloCabeza sigue igual
+        vectorOjosCerrados: vectorOjosCerradosRef.current,
+        vectorAnguloCabeza: vectorAnguloCabezaRef.current,
+        tiempoLectura: tiempoFinal,
+        // AGREGADO: Información adicional útil
+        totalParpadeos: vectorOjosCerradosRef.current.length,
+        totalAngulosExcesivos: vectorAnguloCabezaRef.current.length,
+        promedioParpadeosPorMinuto: vectorOjosCerradosRef.current.length > 0 ? (vectorOjosCerradosRef.current.length / (tiempoFinal / 60)) : 0
+      };
 
-    console.log("Datos finales a enviar:", datos);
+      console.log("📊 DATOS FINALES A ENVIAR:");
+      console.log("Vector de parpadeos (con timestamps):", vectorOjosCerradosRef.current);
+      console.log("Vector de ángulos excesivos (solo conteo):", vectorAnguloCabezaRef.current);
+      console.log("Total parpadeos:", vectorOjosCerradosRef.current.length);
+      console.log("Tiempo total:", tiempoFinal, "segundos");
 
-    const response = await fetch("http://localhost:8000/api/ia/atencion", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(datos),
-    });
+      const response = await fetch("http://localhost:8000/api/ia/atencion", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(datos),
+      });
 
-    if (!response.ok) {
-      throw new Error(`Error en la petición: ${response.status}`);
+      if (!response.ok) {
+        throw new Error(`Error en la petición: ${response.status}`);
+      }
+
+      console.log("✅ Datos enviados correctamente");
+    } catch (err) {
+      console.error("❌ Error enviando atención:", err);
     }
+  };
 
-    console.log("✅ Datos enviados correctamente");
-  } catch (err) {
-    console.error("❌ Error enviando atención:", err);
-  }
-};
-useImperativeHandle(ref, () => ({
+  useImperativeHandle(ref, () => ({
     enviarAtencion,
   }));
 
@@ -167,6 +286,16 @@ useImperativeHandle(ref, () => ({
     vectorAnguloCabezaRef.current = [];
     tiempoTotalRef.current = 0;
     runningRef.current = true;
+    
+    // Reiniciar calibración
+    estadoOjosRef.current = {
+      abiertos: true,
+      umbralParpadeo: 0.25,
+      historialEAR: [],
+      calibrando: true,
+      umbralAdaptativo: 0.20
+    };
+    
     let cancelled = false;
 
     async function startCamera() {
@@ -216,6 +345,7 @@ useImperativeHandle(ref, () => ({
         });
         if (cancelled || !faceLandmarkerRef.current) return;
 
+        // Aumentamos a 60 FPS para mejor detección de parpadeos
         intervalRef.current = setInterval(async () => {
           if (!runningRef.current || !videoRef.current || !faceLandmarkerRef.current) return;
           const video = videoRef.current;
@@ -226,8 +356,10 @@ useImperativeHandle(ref, () => ({
             if (results.faceLandmarks && results.faceLandmarks.length > 0) {
               detectarParpadeo(results.faceLandmarks);
             }
+            
             const matrixData = results.facialTransformationMatrixes?.[0]?.data;
             if (!matrixData) return;
+            
             const [r00, r01, r02, , r10, r11, r12, , r20, r21, r22] = matrixData;
             const pitch = Math.asin(-r21);
             const yaw = Math.atan2(r20, r22);
@@ -238,7 +370,7 @@ useImperativeHandle(ref, () => ({
             ultimoAnguloRef.current = { pitch: pitchDeg, yaw: yawDeg, roll: rollDeg };
             detectarAnguloExcesivo(pitchDeg, yawDeg, rollDeg);
 
-            if (onEmotionChange) {
+            if (onEmotionChange && !estadoOjosRef.current.calibrando) {
               const umbral = 20;
               const concentrado =
                 Math.abs(pitchDeg) <= umbral &&
@@ -253,7 +385,7 @@ useImperativeHandle(ref, () => ({
           } catch (err) {
             console.error('❌ Error en detectForVideo:', err);
           }
-        }, 1000 / 24); // 🔹 Subimos a 30 FPS
+        }, 1000 / 60); // 60 FPS para mejor detección
       } catch (err) {
         console.error('❌ Error inicializando FaceLandmarker:', err);
       }
@@ -284,14 +416,24 @@ useImperativeHandle(ref, () => ({
       <div style={{ 
         position: 'absolute', top: '10px', left: '10px', 
         background: 'rgba(0,0,0,0.7)', color: 'white', padding: '8px',
-        borderRadius: '4px', fontSize: '12px'
+        borderRadius: '4px', fontSize: '12px', minWidth: '200px'
       }}>
         <div>Activo: {active ? 'Sí' : 'No'}</div>
+        <div>Estado: {estadoOjosRef.current.calibrando ? '🔧 Calibrando...' : '✅ Detectando'}</div>
         <div>Parpadeos: {vectorOjosCerradosRef.current.length}</div>
         <div>Ángulos &gt; 48°: {vectorAnguloCabezaRef.current.length}</div>
-        <div>Tiempo: {inicioAnalisisRef.current ? Math.floor((Date.now() - inicioAnalisisRef.current.getTime()) / 1000) : 0}s</div>
+        <div>Tiempo: {inicioAnalisisRef.current ? obtenerTiempoRelativo() : '0:0:0:00'}</div>
+        <div>Umbral EAR: {estadoOjosRef.current.umbralAdaptativo.toFixed(4)}</div>
+        {/* AGREGADO: Mostrar últimos parpadeos */}
+        {vectorOjosCerradosRef.current.length > 0 && (
+          <div style={{ marginTop: '5px', fontSize: '10px' }}>
+            <div>Últimos parpadeos:</div>
+            {vectorOjosCerradosRef.current.slice(-3).map((tiempo, index) => (
+              <div key={index} style={{ color: '#90EE90' }}>• {tiempo}</div>
+            ))}
+          </div>
+        )}
       </div>
-      
     </div>
   );
 });
