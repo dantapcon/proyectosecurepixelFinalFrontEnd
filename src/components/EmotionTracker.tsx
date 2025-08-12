@@ -208,19 +208,22 @@ const EmotionTracker = forwardRef(function EmotionTracker({
       const tiempoFinal = inicioAnalisisRef.current
         ? (Date.now() - inicioAnalisisRef.current.getTime()) / 1000
         : tiempoTotalRef.current;
+      console.log(vectorOjosCerradosRef.current);
+      console.log(vectorAnguloCabezaRef.current);
+      const vectorOjosCerrados = [...vectorOjosCerradosRef.current];
+      const vectorAnguloCabeza = [...vectorAnguloCabezaRef.current];
 
+      console.log(vectorOjosCerrados);
+      console.log(vectorAnguloCabeza);
       const datos = {
         tema: topicId,
         Usuario: userId,
         fecha: new Date().toISOString(),
         // SOLO vectorOjosCerrados tiene timestamps, vectorAnguloCabeza sigue igual
-        vectorOjosCerrados: vectorOjosCerradosRef.current,
-        vectorAnguloCabeza: vectorAnguloCabezaRef.current,
+        vectorOjosCerados: vectorOjosCerrados,
+        vectorAnguloCabeza: vectorAnguloCabeza,
         tiempoLectura: tiempoFinal,
-        // AGREGADO: Información adicional útil
-        totalParpadeos: vectorOjosCerradosRef.current.length,
-        totalAngulosExcesivos: vectorAnguloCabezaRef.current.length,
-        promedioParpadeosPorMinuto: vectorOjosCerradosRef.current.length > 0 ? (vectorOjosCerradosRef.current.length / (tiempoFinal / 60)) : 0
+        
       };
 
       console.log("📊 DATOS FINALES A ENVIAR:");
