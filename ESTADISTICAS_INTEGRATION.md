@@ -178,6 +178,46 @@ headers: {
 }
 ```
 
+### ReporteAtencionEstudiantes **ACTUALIZADA**
+```typescript
+{
+  atencion: Array<{
+    tema: string
+    fecha: string
+    vectorOjosCerados: string[]     // Momentos cuando los ojos estuvieron cerrados
+    vectorAnguloCabeza: string[]    // Datos del ángulo de la cabeza
+    tiempoLectura: number           // Tiempo en minutos
+  }>
+  emociones: Array<{
+    emociones: { [key: string]: number }  // Conteo de cada emoción detectada
+    emocionPredominante: string           // Emoción más frecuente
+    numImgProsesadas: number              // Total de imágenes analizadas
+  }>
+}
+```
+
+**Datos reales de ejemplo:**
+```json
+{
+  "atencion": [
+    {
+      "tema": "tema prueva",
+      "fecha": "2025-08-12", 
+      "vectorOjosCerados": ["0:0:4:58", "0:0:5:32", "0:0:7:10", "0:0:8:87"],
+      "vectorAnguloCabeza": [],
+      "tiempoLectura": 11.657
+    }
+  ],
+  "emociones": [
+    {
+      "emociones": { "neutral": 7 },
+      "emocionPredominante": "neutral", 
+      "numImgProsesadas": 7
+    }
+  ]
+}
+```
+
 ## Cómo Usar
 
 1. **Dashboard de Admin**: Las estadísticas se cargan automáticamente al ingresar
@@ -312,3 +352,31 @@ Se mostraría:
 - **Filtrado inteligente**: Solo muestra emociones con datos (> 0%)
 - **Colores dinámicos**: Sistema de colores adaptativo para cada emoción
 - **Datos reales**: Usa calificaciones promedio reales de la API (escala 0-20)
+
+## Página de Reporte de Atención **COMPLETAMENTE RENOVADA**
+
+### 🎯 **Nuevas Funcionalidades Implementadas**
+
+#### **Análisis de Sesiones de Lectura**
+- **Seguimiento temporal**: Muestra fecha y duración de cada sesión
+- **Detección de distracción**: Vectores de tiempo cuando los ojos estuvieron cerrados
+- **Métricas de atención**: Cálculo automático del nivel de atención basado en distracciones
+- **Visualización de temas**: Cada sesión muestra el tema estudiado
+
+#### **Análisis de Emociones Detallado**
+- **Procesamiento agregado**: Suma todas las emociones detectadas across sesiones
+- **Visualización por porcentajes**: Muestra distribución de emociones
+- **Colores dinámicos**: Sistema de colores para cada tipo de emoción
+- **Conteo de imágenes**: Total de imágenes procesadas por el sistema de IA
+
+#### **Métricas Calculadas**
+- **Nivel de atención promedio**: Basado en frecuencia de distracciones
+- **Tiempo total de lectura**: Suma de todas las sesiones
+- **Eventos de distracción**: Conteo y formateo de momentos específicos
+- **Estado de atención**: Clasificación (Excelente/Bueno/Regular/Necesita Atención)
+
+#### **Interfaz Mejorada**
+- **Selección de estudiantes**: Lista completa con búsqueda
+- **Cards informativas**: Métricas principales destacadas
+- **Layout en grid**: Sesiones y emociones lado a lado
+- **Información contextual**: Detalles del estudiante y resumen

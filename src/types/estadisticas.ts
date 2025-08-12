@@ -19,16 +19,18 @@ export interface ReporteEstadisticasGenerales {
 }
 
 export interface ReporteAtencionEstudiantes {
-  estudiantes: Array<{
-    id: number
-    nombre: string
-    apellido: string
-    email: string
-    nivel_atencion_promedio: number
-    sesiones_totales: number
-    ultima_sesion: string
+  atencion: Array<{
+    tema: string
+    fecha: string
+    vectorOjosCerados: string[]
+    vectorAnguloCabeza: string[]
+    tiempoLectura: number
   }>
-  promedio_general_atencion: number
+  emociones: Array<{
+    emociones: { [key: string]: number }
+    emocionPredominante: string
+    numImgProsesadas: number
+  }>
 }
 
 export interface ReporteEmocionesEstudiante {

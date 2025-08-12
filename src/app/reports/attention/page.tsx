@@ -123,6 +123,50 @@ export default function ReporteAtencionPage() {
 
   const selectedStudent = allStudents.find(s => s.id === selectedStudentId)
 
+  // Funciones auxiliares para procesar datos de atención
+  const calcularPromedioAtencion = (reporte: ReporteAtencionEstudiantes) => {
+    if (!reporte?.atencion?.length) return 0
+    const tiempoTotal = reporte.atencion.reduce((sum, sesion) => sum + sesion.tiempoLectura, 0)
+    const sesionesConOjosCerrados = reporte.atencion.filter(s => s.vectorOjosCerados.length > 0).length
+    const factorAtencion = sesionesConOjosCerrados > 0 ? 1 - (sesionesConOjosCerrados / reporte.atencion.length) : 1
+    return Math.round(factorAtencion * 100)
+  }
+
+  const procesarEmociones = (emociones: any[]) => {
+    const emocionesAgregadas: { [key: string]: number } = {}
+    let totalImagenes = 0
+    
+    emociones.forEach(entry => {
+      Object.entries(entry.emociones).forEach(([emocion, cantidad]) => {
+        emocionesAgregadas[emocion] = (emocionesAgregadas[emocion] || 0) + (cantidad as number)
+        totalImagenes += cantidad as number
+      })
+    })
+    
+    return { emocionesAgregadas, totalImagenes }
+  }
+
+  const obtenerColorEmocion = (emocion: string) => {
+    const colores: { [key: string]: string } = {
+      neutral: 'bg-gray-500',
+      happy: 'bg-green-500',
+      sad: 'bg-blue-500',
+      angry: 'bg-red-500',
+      fear: 'bg-yellow-500',
+      surprise: 'bg-pink-500',
+      disgust: 'bg-orange-500',
+      contempt: 'bg-purple-500'
+    }
+    return colores[emocion] || 'bg-gray-400'
+  }
+
+  const formatearTiempo = (vectorTiempo: string[]) => {
+    return vectorTiempo.map(tiempo => {
+      const partes = tiempo.split(':')
+      return `${partes[1]}min ${partes[2]}s`
+    }).join(', ')
+  }
+
   const getAttentionLevelColor = (level: number) => {
     if (level >= 80) return 'text-green-600 bg-green-50'
     if (level >= 60) return 'text-yellow-600 bg-yellow-50'
@@ -302,7 +346,7 @@ export default function ReporteAtencionPage() {
                     <div>
                       <p className="text-sm text-gray-600">Nivel de Atención</p>
                       <p className="text-2xl font-bold text-green-600">
-                        {reporteAtencion.promedio_general_atencion?.toFixed(1) || 'N/A'}%
+                        {calcularPromedioAtencion(reporteAtencion)}%
                       </p>
                     </div>
                     <Eye className="h-8 w-8 text-green-600" />
@@ -316,7 +360,7 @@ export default function ReporteAtencionPage() {
                     <div>
                       <p className="text-sm text-gray-600">Estado</p>
                       <p className="text-2xl font-bold text-orange-600">
-                        {reporteAtencion.promedio_general_atencion > 60 ? 'Bueno' : 'Necesita Atención'}
+                        {getAttentionLevelLabel(calcularPromedioAtencion(reporteAtencion))}
                       </p>
                     </div>
                     <AlertTriangle className="h-8 w-8 text-orange-600" />
@@ -325,27 +369,123 @@ export default function ReporteAtencionPage() {
               </Card>
             </div>
 
+            {/* Sesiones de Atención */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Clock className="h-5 w-5 mr-2 text-blue-600" />
+                    Sesiones de Lectura
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {reporteAtencion.atencion?.map((sesion, index) => (
+                      <div key={index} className="p-4 bg-gray-50 rounded-lg">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-semibold text-gray-900">{sesion.tema}</h4>
+                          <Badge variant="outline">{sesion.fecha}</Badge>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600">Tiempo de lectura:</p>
+                            <p className="font-medium">{sesion.tiempoLectura.toFixed(2)} min</p>
+                          </div>
+                          <div>
+                            <p className="text-gray-600">Ojos cerrados:</p>
+                            <p className="font-medium">
+                              {sesion.vectorOjosCerados.length > 0 ? `${sesion.vectorOjosCerados.length} eventos` : 'Sin eventos'}
+                            </p>
+                          </div>
+                        </div>
+                        {sesion.vectorOjosCerados.length > 0 && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-500">Momentos de distracción:</p>
+                            <p className="text-xs text-red-600">{formatearTiempo(sesion.vectorOjosCerados)}</p>
+                          </div>
+                        )}
+                      </div>
+                    )) || (
+                      <div className="text-center py-4 text-gray-500">
+                        No hay datos de sesiones de lectura
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Análisis de Emociones */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
+                    Análisis de Emociones
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {(() => {
+                    const { emocionesAgregadas, totalImagenes } = procesarEmociones(reporteAtencion.emociones || [])
+                    return (
+                      <div className="space-y-4">
+                        <div className="text-center mb-4">
+                          <p className="text-sm text-gray-600">Total de imágenes procesadas</p>
+                          <p className="text-2xl font-bold text-blue-600">{totalImagenes}</p>
+                        </div>
+                        
+                        {Object.entries(emocionesAgregadas).map(([emocion, cantidad]) => {
+                          const porcentaje = totalImagenes > 0 ? (cantidad / totalImagenes) * 100 : 0
+                          return (
+                            <div key={emocion} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <div className="flex items-center space-x-3">
+                                <div className={`w-3 h-3 rounded-full ${obtenerColorEmocion(emocion)}`}></div>
+                                <span className="font-medium text-gray-900 capitalize">{emocion}</span>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold text-gray-900">{cantidad} imágenes</p>
+                                <p className="text-sm text-gray-600">{porcentaje.toFixed(1)}%</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        
+                        {Object.keys(emocionesAgregadas).length === 0 && (
+                          <div className="text-center py-4 text-gray-500">
+                            No hay datos de emociones disponibles
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })()}
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Información adicional del reporte */}
             <Card>
               <CardHeader>
-                <CardTitle>Detalles del Análisis</CardTitle>
+                <CardTitle>Resumen del Análisis</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="p-4 bg-blue-50 rounded-lg">
                     <h3 className="font-semibold text-blue-800 mb-2">Información del Estudiante</h3>
+                    <p className="text-sm text-blue-600">Nombre: {selectedStudent?.first_name} {selectedStudent?.last_name}</p>
                     <p className="text-sm text-blue-600">Email: {selectedStudent?.email}</p>
                     <p className="text-sm text-blue-600">Usuario: {selectedStudent?.username}</p>
                   </div>
                   
-                  {reporteAtencion.estudiantes && reporteAtencion.estudiantes.length > 0 && (
-                    <div className="p-4 bg-green-50 rounded-lg">
-                      <h3 className="font-semibold text-green-800 mb-2">Métricas de Atención</h3>
-                      <p className="text-sm text-green-600">
-                        Promedio general: {reporteAtencion.promedio_general_atencion?.toFixed(1)}%
-                      </p>
-                    </div>
-                  )}
+                  <div className="p-4 bg-green-50 rounded-lg">
+                    <h3 className="font-semibold text-green-800 mb-2">Métricas de Rendimiento</h3>
+                    <p className="text-sm text-green-600">
+                      Sesiones analizadas: {reporteAtencion.atencion?.length || 0}
+                    </p>
+                    <p className="text-sm text-green-600">
+                      Tiempo total de lectura: {(reporteAtencion.atencion?.reduce((sum, s) => sum + s.tiempoLectura, 0) || 0).toFixed(2)} min
+                    </p>
+                    <p className="text-sm text-green-600">
+                      Nivel de atención: {getAttentionLevelLabel(calcularPromedioAtencion(reporteAtencion))}
+                    </p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
