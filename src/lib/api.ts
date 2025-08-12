@@ -372,6 +372,10 @@ export const estadisticasAPI = {
     
     const response = await apiRequest(API_ENDPOINTS.ADMIN_DASHBOARD_STATS, {
       method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
     })
     
     console.log('Admin dashboard stats response:', response)
@@ -392,6 +396,10 @@ export const estadisticasAPI = {
     
     return apiRequest(API_ENDPOINTS.REPORTE_ESTADISTICAS_GENERALES, {
       method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
     })
   },
 
@@ -418,6 +426,10 @@ export const estadisticasAPI = {
     
     return apiRequest(API_ENDPOINTS.REPORTE_ATENCION_ESTUDIANTES(studentId), {
       method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
     })
   },
 
@@ -435,6 +447,10 @@ export const estadisticasAPI = {
     
     return apiRequest(API_ENDPOINTS.REPORTE_EMOCIONES_ESTUDIANTE, {
       method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
     })
   },
 
@@ -452,6 +468,10 @@ export const estadisticasAPI = {
     
     return apiRequest(API_ENDPOINTS.PROFESOR_DASHBOARD_STATS, {
       method: 'GET',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
     })
   },
 }

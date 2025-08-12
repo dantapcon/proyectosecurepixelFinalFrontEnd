@@ -472,3 +472,67 @@ if (!mounted) {
 - ❌ Estados iniciales inconsistentes
 - ✅ Hidratación sin errores
 - ✅ Funcionalidad completa en cliente
+
+## Corrección de Autenticación (ACTUALIZADO)
+
+**PROBLEMA RESUELTO:** Se identificó y corrigió un problema crítico donde algunos endpoints de estadísticas no estaban pasando correctamente el token de autenticación en los headers de las requests.
+
+### Endpoints Corregidos:
+- `getAdminDashboardStats()` - ✅ Token agregado
+- `getReporteEstadisticasGenerales()` - ✅ Token agregado  
+- `getReporteAtencionEstudiantes()` - ✅ Token agregado
+- `getReporteEmocionesEstudiante()` - ✅ Token agregado
+- `getProfesorDashboardStats()` - ✅ Token agregado
+
+### Formato de Autenticación:
+Todos los endpoints ahora incluyen consistentemente:
+```javascript
+headers: {
+  'Authorization': `Token ${token}`,
+  'Content-Type': 'application/json',
+}
+```
+
+**IMPORTANTE:** Todos los endpoints de estadísticas requieren autenticación válida y ahora están configurados correctamente para enviar el token en cada request.
+
+### Dashboard de Profesor - Estructura Actualizada
+
+La API para el dashboard de profesor ahora devuelve la siguiente estructura:
+
+```json
+{
+  "n_estudiantes": 0,
+  "n_pruebas_completadas": 0,
+  "n_pruebas_no_completadas": 0,
+  "n_estudiantes_reprobaron": 2,
+  "nota_promedio": 0,
+  "n_cursos": 0
+}
+```
+
+**Tipos TypeScript Actualizados:**
+```typescript
+export interface ProfesorDashboardStats {
+  n_estudiantes: number
+  n_pruebas_completadas: number
+  n_pruebas_no_completadas: number
+  n_estudiantes_reprobaron: number
+  nota_promedio: number
+  n_cursos: number
+}
+```
+
+**Métricas Visualizadas:**
+- **Estudiantes**: Total de estudiantes asignados al profesor
+- **Activos**: Misma cantidad que estudiantes (se asume que todos los asignados están activos)
+- **Evaluaciones**: Número de pruebas completadas
+- **Promedio**: Nota promedio de los estudiantes (escala 0-20)
+- **Pruebas Incompletas**: Evaluaciones pendientes de completar
+- **Reprobados**: Número de estudiantes que han reprobado
+- **Cursos**: Total de cursos asignados al profesor
+
+**Cambios en el Dashboard:**
+- Actualizado para usar la nueva estructura de datos de la API
+- Reemplazadas métricas obsoletas (`tiempo_promedio`, `estudiantes_en_riesgo`) por nuevas métricas relevantes
+- Agregada nueva carta para mostrar total de cursos
+- Mantiene compatibilidad con valores por defecto en caso de datos faltantes

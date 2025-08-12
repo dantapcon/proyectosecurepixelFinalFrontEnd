@@ -65,12 +65,10 @@ export interface ReporteEmocionesEstudiante {
 }
 
 export interface ProfesorDashboardStats {
-  total_estudiantes: number
-  estudiantes_activos: number
-  evaluaciones_completadas: number
-  puntaje_promedio: number
-  tiempo_promedio: string
-  estudiantes_en_riesgo: number
-  cursos_asignados: number
-  temas_creados: number
+  n_estudiantes: number
+  n_pruebas_completadas: number
+  n_pruebas_no_completadas: number
+  n_estudiantes_reprobaron: number
+  nota_promedio: number
+  n_cursos: number
 }

@@ -328,12 +328,13 @@ export default function TeacherDashboard() {
 
   // Combinar datos de la API con datos mock como fallback
   const classStats = {
-    totalStudents: profesorStats?.total_estudiantes || 32,
-    activeStudents: profesorStats?.estudiantes_activos || 28,
-    completedEvaluations: profesorStats?.evaluaciones_completadas || 156,
-    averageScore: profesorStats?.puntaje_promedio || 78,
-    averageTime: profesorStats?.tiempo_promedio || "22:15",
-    riskStudents: profesorStats?.estudiantes_en_riesgo || 4,
+    totalStudents: profesorStats?.n_estudiantes || 0,
+    activeStudents: profesorStats?.n_estudiantes || 0, // Si hay estudiantes, se asume que están activos
+    completedEvaluations: profesorStats?.n_pruebas_completadas || 0,
+    incompleteEvaluations: profesorStats?.n_pruebas_no_completadas || 0,
+    averageScore: profesorStats?.nota_promedio || 0,
+    failedStudents: profesorStats?.n_estudiantes_reprobaron || 0,
+    totalCourses: profesorStats?.n_cursos || 0,
   }
 
   const studentPerformance = [
@@ -501,8 +502,8 @@ export default function TeacherDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">Tiempo Prom.</p>
-                  <p className="text-2xl font-bold text-indigo-600">{classStats.averageTime}</p>
+                  <p className="text-sm text-gray-600">Pruebas Incompletas</p>
+                  <p className="text-2xl font-bold text-indigo-600">{classStats.incompleteEvaluations}</p>
                 </div>
                 <Clock className="h-8 w-8 text-indigo-600" />
               </div>
@@ -513,10 +514,22 @@ export default function TeacherDashboard() {
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-gray-600">En Riesgo</p>
-                  <p className="text-2xl font-bold text-red-600">{classStats.riskStudents}</p>
+                  <p className="text-sm text-gray-600">Reprobados</p>
+                  <p className="text-2xl font-bold text-red-600">{classStats.failedStudents}</p>
                 </div>
                 <AlertTriangle className="h-8 w-8 text-red-600" />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-teal-100">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Cursos</p>
+                  <p className="text-2xl font-bold text-teal-600">{classStats.totalCourses}</p>
+                </div>
+                <BookOpen className="h-8 w-8 text-teal-600" />
               </div>
             </CardContent>
           </Card>
