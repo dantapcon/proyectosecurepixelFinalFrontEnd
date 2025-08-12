@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Shield, BookOpen, Brain, Camera, TrendingUp, Clock, Award, Target, User, Settings, LogOut, PlayCircle } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
-import { apiRequest, API_ENDPOINTS, topicAPI, courseAPI } from "@/lib/api"
+import { apiRequest, API_ENDPOINTS, topicAPI, courseAPI, estadisticasAPI, isAuthenticated } from "@/lib/api"
 
 // Interfaces para los datos
 interface Course {
@@ -34,6 +34,8 @@ export default function DashboardPage() {
   const [courseTopics, setCourseTopics] = useState<Topic[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
+  const [studentEmotionStats, setStudentEmotionStats] = useState<any>(null)
+  const [isLoadingEmotionStats, setIsLoadingEmotionStats] = useState(false)
   const { logout, user } = useAuth()
   const router = useRouter()
 
@@ -64,6 +66,8 @@ export default function DashboardPage() {
           loadUserCourse(user.curso),
           loadCourseTopics(user.curso)
         ])
+        // Cargar estadísticas de emociones del estudiante
+        loadStudentEmotionStats()
       } else {
         console.log('Usuario sin curso asignado')
         setUserCourse(null)
@@ -125,6 +129,35 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error loading topics:', error)
       setError('Error al cargar los temas')
+    }
+  }
+
+  // Cargar estadísticas de emociones del estudiante
+  const loadStudentEmotionStats = async () => {
+    // Verificar autenticación antes de hacer la llamada
+    if (!isAuthenticated()) {
+      console.log('No hay token de autenticación para cargar estadísticas de emociones')
+      return
+    }
+    
+    setIsLoadingEmotionStats(true)
+    try {
+      // La API de emociones ahora no requiere ID en la URL, usa el token para identificar al usuario
+      const response = await estadisticasAPI.getReporteEmocionesEstudiante()
+      
+      if (response.ok) {
+        setStudentEmotionStats(response.data)
+        console.log('Estadísticas de emociones cargadas:', response.data)
+      } else {
+        console.error('Error cargando estadísticas de emociones:', response)
+        if (response.status === 401) {
+          console.log('Token expirado o inválido para estadísticas de emociones')
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando estadísticas de emociones:', error)
+    } finally {
+      setIsLoadingEmotionStats(false)
     }
   }
 
@@ -385,103 +418,61 @@ export default function DashboardPage() {
             </Card>
 
             {/* Emotional Analysis */}
-            
-
-            {/* Recommendations */}
             <Card>
               <CardHeader>
-                <CardTitle>Recomendaciones</CardTitle>
+                <CardTitle>Análisis Emocional</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {userCourse && courseTopics.length > 0 ? (
-                    <>
-                      <div className="p-3 bg-blue-50 rounded-lg">
-                        <p className="text-sm text-blue-800 font-medium">
-                          Continúa con: {courseTopics[0]?.titulo || 'Próximo tema'}
-                        </p>
-                        <p className="text-xs text-blue-600 mt-1">Sigue tu progreso en el curso</p>
+                  {isLoadingEmotionStats ? (
+                    <div className="animate-pulse flex space-x-4">
+                      <div className="flex-1 py-2">
+                        <div className="h-4 bg-gray-200 rounded"></div>
+                        <div className="h-4 bg-gray-200 rounded mt-2"></div>
+                        <div className="h-4 bg-gray-200 rounded mt-2"></div>
                       </div>
-                      <div className="p-3 bg-green-50 rounded-lg">
-                        <p className="text-sm text-green-800 font-medium">¡Excelente progreso!</p>
-                        <p className="text-xs text-green-600 mt-1">
-                          {courseTopics.length} temas disponibles en tu curso
-                        </p>
+                    </div>
+                  ) : studentEmotionStats ? (
+                    <div className="space-y-4">
+                      <div className="text-sm text-gray-600 mb-3">
+                        Sesiones analizadas: {studentEmotionStats.sesiones_analizadas || 0}
                       </div>
-                    </>
-                  ) : userCourse ? (
-                    <div className="p-3 bg-yellow-50 rounded-lg">
-                      <p className="text-sm text-yellow-800 font-medium">Curso sin contenido</p>
-                      <p className="text-xs text-yellow-600 mt-1">
-                        Tu profesor aún no ha agregado temas a este curso
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="p-3 bg-red-50 rounded-lg">
-                      <p className="text-sm text-red-800 font-medium">Sin curso asignado</p>
-                      <p className="text-xs text-red-600 mt-1">
-                        Contacta a tu administrador para obtener acceso a un curso
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Actividad Reciente</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {userCourse ? (
-                    <>
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">
-                            Te inscribiste en "{userCourse.nombreCurso}"
-                          </p>
-                          <p className="text-xs text-gray-500">Curso activo</p>
+                      {studentEmotionStats.emociones_detectadas && studentEmotionStats.emociones_detectadas.length > 0 ? (
+                        <div className="space-y-3">
+                          {studentEmotionStats.emociones_detectadas.slice(0, 3).map((emocion: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                              <div>
+                                <p className="text-sm font-medium text-blue-800 capitalize">
+                                  {emocion.emocion}
+                                </p>
+                                <p className="text-xs text-blue-600">
+                                  {emocion.cantidad} detecciones
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-lg font-bold text-blue-600">
+                                  {emocion.porcentaje.toFixed(1)}%
+                                </p>
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                      </div>
-                      {courseTopics.length > 0 && (
-                        <div className="flex items-center space-x-3">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <div className="flex-1">
-                            <p className="text-sm text-gray-900">
-                              {courseTopics.length} tema{courseTopics.length !== 1 ? 's' : ''} disponible{courseTopics.length !== 1 ? 's' : ''} para estudiar
-                            </p>
-                            <p className="text-xs text-gray-500">Temas del curso</p>
-                          </div>
+                      ) : (
+                        <div className="p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm text-gray-600">No hay datos de emociones disponibles</p>
                         </div>
                       )}
-                      <div className="flex items-center space-x-3">
-                        <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-900">Acceso al dashboard estudiantil habilitado</p>
-                          <p className="text-xs text-gray-500">Sistema listo</p>
-                        </div>
-                      </div>
-                    </>
+                    </div>
                   ) : (
-                    <div className="flex items-center space-x-3">
-                      <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
-                      <div className="flex-1">
-                        <p className="text-sm text-gray-900">Esperando asignación de curso</p>
-                        <p className="text-xs text-gray-500">Contacta a tu administrador</p>
-                      </div>
+                    <div className="text-center py-8">
+                      <Camera className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No se pudo cargar el análisis emocional.</p>
+                      <p className="text-sm text-gray-400 mt-2">Intenta nuevamente más tarde.</p>
                     </div>
                   )}
                 </div>
               </CardContent>
             </Card>
-
-
-
-
-
-
-
           </div>
         </div>
       </div>

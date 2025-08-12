@@ -1,6 +1,15 @@
 // Configuración de la API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
+// Importar tipos
+import type { 
+  AdminDashboardStats, 
+  ReporteEstadisticasGenerales, 
+  ReporteAtencionEstudiantes, 
+  ReporteEmocionesEstudiante, 
+  ProfesorDashboardStats 
+} from '@/types/estadisticas'
+
 
 //comentario prueva
 export const API_ENDPOINTS = {
@@ -33,6 +42,13 @@ export const API_ENDPOINTS = {
   ATENCION: `${API_BASE_URL}/api/ia/atencion`,
   EMOCIONES: (pruebaId: number) =>`${API_BASE_URL}/api/ia/emociones/${pruebaId}/`,
   
+  // Estadísticas
+  ADMIN_DASHBOARD_STATS: `${API_BASE_URL}/api/estadisticas/admin-dashboard`,
+  REPORTE_ESTADISTICAS_GENERALES: `${API_BASE_URL}/api/estadisticas/reporte-estadisticas-generales`,
+  REPORTE_ATENCION_ESTUDIANTES: (studentId: number) => `${API_BASE_URL}/api/estadisticas/reporte-atencion-estudiantes/${studentId}`,
+  REPORTE_EMOCIONES_ESTUDIANTE: `${API_BASE_URL}/api/estadisticas/reporte-emociones-estudiante`,
+  PROFESOR_DASHBOARD_STATS: `${API_BASE_URL}/api/estadisticas/profesor-dashboard`,
+  
   // Enseñanza y preguntas (para futuras implementaciones)
   TEACHING: `${API_BASE_URL}/api/ensennanza/`,
   QUESTIONS: `${API_BASE_URL}/api/preguntas/`,
@@ -41,6 +57,13 @@ export const API_ENDPOINTS = {
 // Función helper para hacer peticiones
 export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+  
+  // Log para debugging - solo mostrar si hay token
+  if (token) {
+    console.log('Making authenticated request to:', endpoint)
+  } else {
+    console.log('Making unauthenticated request to:', endpoint)
+  }
   
   const defaultOptions: RequestInit = {
     headers: {
@@ -52,8 +75,22 @@ export async function apiRequest(endpoint: string, options: RequestInit = {}) {
   }
 
   try {
-    console.log('Making request to:', endpoint, 'with options:', defaultOptions)
+    console.log('Request headers:', defaultOptions.headers)
     const response = await fetch(endpoint, defaultOptions)
+    
+    // Verificar si la respuesta es 401 (No autorizado)
+    if (response.status === 401) {
+      console.error('Authentication failed - Token may be invalid or expired')
+      // Limpiar el token inválido
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+      }
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación inválido o expirado' },
+      }
+    }
     
     let data;
     
@@ -314,6 +351,129 @@ export const emotionAPI = {
       body: JSON.stringify(data),
     })
   },
+}
+
+// API de estadísticas
+export const estadisticasAPI = {
+  // Dashboard de administrador
+  getAdminDashboardStats: async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      console.error('No token found for admin dashboard stats request')
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación requerido' }
+      }
+    }
+    
+    console.log('Calling admin dashboard stats endpoint:', API_ENDPOINTS.ADMIN_DASHBOARD_STATS)
+    console.log('Token being used:', token ? 'Present' : 'Missing')
+    
+    const response = await apiRequest(API_ENDPOINTS.ADMIN_DASHBOARD_STATS, {
+      method: 'GET',
+    })
+    
+    console.log('Admin dashboard stats response:', response)
+    return response
+  },
+
+  // Reporte de estadísticas generales
+  getReporteEstadisticasGenerales: async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      console.error('No token found for general stats request')
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación requerido' }
+      }
+    }
+    
+    return apiRequest(API_ENDPOINTS.REPORTE_ESTADISTICAS_GENERALES, {
+      method: 'GET',
+    })
+  },
+
+  // Reporte de atención de estudiantes (requiere ID del estudiante)
+  getReporteAtencionEstudiantes: async (studentId: number) => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      console.error('No token found for attention report request')
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación requerido' }
+      }
+    }
+    
+    if (!studentId || studentId <= 0) {
+      console.error('Invalid student ID provided for attention report:', studentId)
+      return {
+        ok: false,
+        status: 400,
+        data: { message: 'ID de estudiante requerido para el reporte de atención' }
+      }
+    }
+    
+    return apiRequest(API_ENDPOINTS.REPORTE_ATENCION_ESTUDIANTES(studentId), {
+      method: 'GET',
+    })
+  },
+
+  // Reporte de emociones de estudiante (no requiere ID en URL)
+  getReporteEmocionesEstudiante: async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      console.error('No token found for student emotions request')
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación requerido' }
+      }
+    }
+    
+    return apiRequest(API_ENDPOINTS.REPORTE_EMOCIONES_ESTUDIANTE, {
+      method: 'GET',
+    })
+  },
+
+  // Dashboard de profesor
+  getProfesorDashboardStats: async () => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      console.error('No token found for teacher dashboard stats request')
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación requerido' }
+      }
+    }
+    
+    return apiRequest(API_ENDPOINTS.PROFESOR_DASHBOARD_STATS, {
+      method: 'GET',
+    })
+  },
+}
+
+// Función helper para verificar autenticación
+export function isAuthenticated(): boolean {
+  if (typeof window === 'undefined') return false
+  const token = localStorage.getItem('token')
+  return !!token
+}
+
+// Función helper para obtener el token
+export function getAuthToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem('token')
+}
+
+// Función helper para limpiar el token
+export function clearAuthToken(): void {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem('token')
+  }
 }
 
 // Función helper para determinar la ruta de redirección según el tipo de usuario

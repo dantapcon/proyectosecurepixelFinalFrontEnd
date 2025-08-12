@@ -31,7 +31,8 @@ import {
   FileText,
 } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
-import { courseAPI, topicAPI } from "@/lib/api"
+import { courseAPI, topicAPI, estadisticasAPI, isAuthenticated } from "@/lib/api"
+import type { ProfesorDashboardStats } from "@/types/estadisticas"
 
 // Interfaces
 interface Course {
@@ -68,6 +69,11 @@ export default function TeacherDashboard() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   
+  // Estados para estadísticas del profesor
+  const [profesorStats, setProfesorStats] = useState<ProfesorDashboardStats | null>(null)
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [statsError, setStatsError] = useState("")
+  
   // Estados para formularios de temas
   const [editingTopic, setEditingTopic] = useState<Topic | null>(null)
   const [showTopicForm, setShowTopicForm] = useState(false)
@@ -94,7 +100,42 @@ export default function TeacherDashboard() {
     }
     
     loadTeacherData()
+    loadProfesorStats()
   }, [user, router])
+
+  // Cargar estadísticas del profesor
+  const loadProfesorStats = async () => {
+    setIsLoadingStats(true)
+    setStatsError("")
+    
+    // Verificar autenticación antes de hacer la llamada
+    if (!isAuthenticated()) {
+      setStatsError('No estás autenticado. Por favor, inicia sesión nuevamente.')
+      setIsLoadingStats(false)
+      return
+    }
+    
+    try {
+      const response = await estadisticasAPI.getProfesorDashboardStats()
+      
+      if (response.ok) {
+        setProfesorStats(response.data)
+        console.log('Estadísticas del profesor cargadas:', response.data)
+      } else {
+        console.error('Error cargando estadísticas profesor:', response)
+        if (response.status === 401) {
+          setStatsError('Sesión expirada. Por favor, inicia sesión nuevamente.')
+        } else {
+          setStatsError('Error al cargar estadísticas del profesor')
+        }
+      }
+    } catch (error) {
+      console.error('Error cargando estadísticas profesor:', error)
+      setStatsError('Error de conexión al cargar estadísticas del profesor')
+    } finally {
+      setIsLoadingStats(false)
+    }
+  }
 
   // Cargar cursos del docente y temas
   const loadTeacherData = async () => {
@@ -285,14 +326,14 @@ export default function TeacherDashboard() {
     }
   }
 
-  // Mock data for teacher dashboard
+  // Combinar datos de la API con datos mock como fallback
   const classStats = {
-    totalStudents: 32,
-    activeStudents: 28,
-    completedEvaluations: 156,
-    averageScore: 78,
-    averageTime: "22:15",
-    riskStudents: 4,
+    totalStudents: profesorStats?.total_estudiantes || 32,
+    activeStudents: profesorStats?.estudiantes_activos || 28,
+    completedEvaluations: profesorStats?.evaluaciones_completadas || 156,
+    averageScore: profesorStats?.puntaje_promedio || 78,
+    averageTime: profesorStats?.tiempo_promedio || "22:15",
+    riskStudents: profesorStats?.estudiantes_en_riesgo || 4,
   }
 
   const studentPerformance = [

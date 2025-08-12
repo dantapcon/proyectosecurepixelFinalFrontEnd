@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,13 +28,81 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
+import { estadisticasAPI, isAuthenticated } from "@/lib/api"
+import type { AdminDashboardStats, ReporteEstadisticasGenerales, ReporteAtencionEstudiantes } from "@/types/estadisticas"
 
 export default function AdminDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("7d")
   const [selectedModule, setSelectedModule] = useState("all")
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null)
+  const [reporteGeneral, setReporteGeneral] = useState<ReporteEstadisticasGenerales | null>(null)
+  const [reporteAtencion, setReporteAtencion] = useState<ReporteAtencionEstudiantes | null>(null)
+  const [isLoadingStats, setIsLoadingStats] = useState(true)
+  const [statsError, setStatsError] = useState("")
   const { logout } = useAuth()
   const router = useRouter()
+
+  // Cargar estadísticas al montar el componente
+  useEffect(() => {
+    loadAdminStats()
+  }, [])
+
+  const loadAdminStats = async () => {
+    setIsLoadingStats(true)
+    setStatsError("")
+    
+    // Verificar autenticación antes de hacer las llamadas
+    if (!isAuthenticated()) {
+      setStatsError('No estás autenticado. Por favor, inicia sesión nuevamente.')
+      setIsLoadingStats(false)
+      return
+    }
+    
+    try {
+      // Cargar estadísticas del dashboard de admin
+      console.log('Iniciando carga de estadísticas admin...')
+      const [statsResponse, reporteGeneralResponse] = await Promise.all([
+        estadisticasAPI.getAdminDashboardStats(),
+        estadisticasAPI.getReporteEstadisticasGenerales()
+      ])
+
+      console.log('Respuesta completa de adminDashboardStats:', statsResponse)
+      console.log('¿Respuesta OK?:', statsResponse.ok)
+      console.log('Datos recibidos:', statsResponse.data)
+
+      if (statsResponse.ok) {
+        console.log('Asignando datos a adminStats:', statsResponse.data)
+        setAdminStats(statsResponse.data)
+        console.log('AdminStats después de asignar:', statsResponse.data)
+      } else {
+        console.error('Error cargando estadísticas admin:', statsResponse)
+        if (statsResponse.status === 401) {
+          setStatsError('Sesión expirada. Por favor, inicia sesión nuevamente.')
+        } else {
+          setStatsError('Error al cargar estadísticas del administrador')
+        }
+      }
+
+      if (reporteGeneralResponse.ok) {
+        setReporteGeneral(reporteGeneralResponse.data)
+      } else {
+        console.error('Error cargando reporte general:', reporteGeneralResponse)
+        if (reporteGeneralResponse.status === 401) {
+          setStatsError('Sesión expirada. Por favor, inicia sesión nuevamente.')
+        }
+      }
+
+      // Nota: El reporte de atención ahora requiere un ID específico de estudiante
+      // Se cargará desde la página dedicada de reportes
+
+    } catch (error) {
+      console.error('Error cargando estadísticas:', error)
+      setStatsError('Error de conexión al cargar las estadísticas')
+    } finally {
+      setIsLoadingStats(false)
+    }
+  }
 
   const handleLogout = async () => {
     setIsLoggingOut(true)
@@ -48,15 +116,19 @@ export default function AdminDashboard() {
     }
   }
 
-  // Mock data
+  // Combinar datos de la API con datos mock como fallback
   const systemStats = {
-    totalStudents: 156,
-    activeEvaluations: 12,
-    completedEvaluations: 1247,
-    systemUptime: "99.8%",
-    emotionDetectionAccuracy: "94.2%",
-    aiResponseTime: "1.2s",
+    totalStudents: adminStats?.n_usuarios || 156,
+    activeEvaluations: adminStats?.n_pruebas_no_completadas || 12,
+    completedEvaluations: adminStats?.n_pruebas_completadas || 1247,
+    systemUptime: (adminStats?.uptime || "99.8%"),
+    emotionDetectionAccuracy: adminStats?.nota_promedio || "94.2%",
+    aiResponseTime: adminStats?.n_cursos || "1.2s",
   }
+  console.log("adminStats")
+  console.log(adminStats)
+  console.log("systemStats")
+  console.log(systemStats)
 
   const emotionCorrelationData = [
     { emotion: "Concentrado", avgScore: 87, count: 45 },
@@ -541,37 +613,52 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <Card className="border-blue-100 hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-6 text-center">
-                      <BarChart3 className="h-12 w-12 text-blue-600 mx-auto mb-3" />
-                      <h3 className="font-semibold text-gray-900 mb-2">Reporte de Rendimiento</h3>
-                      <p className="text-sm text-gray-600 mb-4">
-                        Análisis completo del rendimiento estudiantil por módulo
-                      </p>
-                      <Button size="sm" className="w-full">
-                        Generar
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <Link href="/reports/general">
+                    <Card className="border-blue-100 hover:shadow-md transition-shadow cursor-pointer">
+                      <CardContent className="p-6 text-center">
+                        <BarChart3 className="h-12 w-12 text-blue-600 mx-auto mb-3" />
+                        <h3 className="font-semibold text-gray-900 mb-2">Estadísticas Generales</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                          Resumen completo de usuarios, cursos y actividad del sistema
+                        </p>
+                        <Button size="sm" className="w-full">
+                          Ver Reporte
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Link>
 
-                  <Card className="border-green-100 hover:shadow-md transition-shadow cursor-pointer">
-                    <CardContent className="p-6 text-center">
-                      <Camera className="h-12 w-12 text-green-600 mx-auto mb-3" />
-                      <h3 className="font-semibold text-gray-900 mb-2">Análisis Emocional</h3>
-                      <p className="text-sm text-gray-600 mb-4">Correlación entre emociones y desempeño académico</p>
-                      <Button size="sm" className="w-full">
-                        Generar
-                      </Button>
-                    </CardContent>
-                  </Card>
+                  <Link href="/reports/attention">
+                    <Card className="border-green-100 hover:shadow-md transition-shadow cursor-pointer">
+                      <CardContent className="p-6 text-center">
+                        <Eye className="h-12 w-12 text-green-600 mx-auto mb-3" />
+                        <h3 className="font-semibold text-gray-900 mb-2">Atención de Estudiantes</h3>
+                        <p className="text-sm text-gray-600 mb-4">Análisis detallado de niveles de atención y participación</p>
+                        <Button size="sm" className="w-full">
+                          Ver Reporte
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Link>
 
                   <Card className="border-purple-100 hover:shadow-md transition-shadow cursor-pointer">
                     <CardContent className="p-6 text-center">
-                      <Activity className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+                      <Camera className="h-12 w-12 text-purple-600 mx-auto mb-3" />
+                      <h3 className="font-semibold text-gray-900 mb-2">Análisis Emocional</h3>
+                      <p className="text-sm text-gray-600 mb-4">Correlación entre emociones y desempeño académico</p>
+                      <Button size="sm" className="w-full" disabled>
+                        Próximamente
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-orange-100 hover:shadow-md transition-shadow cursor-pointer">
+                    <CardContent className="p-6 text-center">
+                      <Activity className="h-12 w-12 text-orange-600 mx-auto mb-3" />
                       <h3 className="font-semibold text-gray-900 mb-2">Uso del Sistema</h3>
                       <p className="text-sm text-gray-600 mb-4">Estadísticas de uso y actividad de la plataforma</p>
-                      <Button size="sm" className="w-full">
-                        Generar
+                      <Button size="sm" className="w-full" disabled>
+                        Próximamente
                       </Button>
                     </CardContent>
                   </Card>
