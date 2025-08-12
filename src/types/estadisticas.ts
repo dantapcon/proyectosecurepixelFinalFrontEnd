@@ -1,12 +1,12 @@
 // Tipos para las respuestas de la API de estadísticas
 
 export interface AdminDashboardStats {
-  total_estudiantes: number
-  evaluaciones_activas: number
-  evaluaciones_completadas: number
-  tiempo_actividad_sistema: string
-  precision_deteccion_emociones: string
-  tiempo_respuesta_ia: string
+  n_usuarios: number
+  n_pruebas_no_completadas: number
+  n_pruebas_completadas: number
+  uptime: string
+  nota_promedio: string // Promedio sobre 20, se mostrará como string
+  n_cursos: string // Se usa como tiempo de respuesta de IA
 }
 
 export interface ReporteEstadisticasGenerales {
@@ -32,20 +32,26 @@ export interface ReporteAtencionEstudiantes {
 }
 
 export interface ReporteEmocionesEstudiante {
-  estudiante: {
-    id: number
-    nombre: string
-    apellido: string
-    email: string
+  emociones_porcentaje: {
+    happy: number
+    sad: number
+    neutral: number
+    angry: number
+    fear: number
+    contempt?: number
+    disgust?: number
+    surprise?: number
   }
-  emociones_detectadas: Array<{
-    emocion: string
-    cantidad: number
-    porcentaje: number
-  }>
-  sesiones_analizadas: number
-  fecha_primer_analisis: string
-  fecha_ultimo_analisis: string
+  promedios_calificaciones: {
+    happy: number
+    sad: number
+    neutral: number
+    angry: number
+    fear: number
+    contempt?: number
+    disgust?: number
+    surprise?: number
+  }
 }
 
 export interface ProfesorDashboardStats {

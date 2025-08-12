@@ -29,7 +29,7 @@ import {
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
 import { estadisticasAPI, isAuthenticated } from "@/lib/api"
-import type { AdminDashboardStats, ReporteEstadisticasGenerales, ReporteAtencionEstudiantes } from "@/types/estadisticas"
+import type { AdminDashboardStats, ReporteEstadisticasGenerales, ReporteAtencionEstudiantes, ReporteEmocionesEstudiante } from "@/types/estadisticas"
 
 export default function AdminDashboard() {
   const [selectedTimeRange, setSelectedTimeRange] = useState("7d")
@@ -38,6 +38,8 @@ export default function AdminDashboard() {
   const [adminStats, setAdminStats] = useState<AdminDashboardStats | null>(null)
   const [reporteGeneral, setReporteGeneral] = useState<ReporteEstadisticasGenerales | null>(null)
   const [reporteAtencion, setReporteAtencion] = useState<ReporteAtencionEstudiantes | null>(null)
+  const [reporteEmociones, setReporteEmociones] = useState<ReporteEmocionesEstudiante | null>(null)
+  const [emotionCorrelationData, setEmotionCorrelationData] = useState<Array<{emotion: string, avgScore: number, count: number}>>([])
   const [isLoadingStats, setIsLoadingStats] = useState(true)
   const [statsError, setStatsError] = useState("")
   const { logout } = useAuth()
@@ -62,9 +64,10 @@ export default function AdminDashboard() {
     try {
       // Cargar estadísticas del dashboard de admin
       console.log('Iniciando carga de estadísticas admin...')
-      const [statsResponse, reporteGeneralResponse] = await Promise.all([
+      const [statsResponse, reporteGeneralResponse, reporteEmocionesResponse] = await Promise.all([
         estadisticasAPI.getAdminDashboardStats(),
-        estadisticasAPI.getReporteEstadisticasGenerales()
+        estadisticasAPI.getReporteEstadisticasGenerales(),
+        estadisticasAPI.getReporteEmocionesEstudiante()
       ])
 
       console.log('Respuesta completa de adminDashboardStats:', statsResponse)
@@ -91,6 +94,17 @@ export default function AdminDashboard() {
         if (reporteGeneralResponse.status === 401) {
           setStatsError('Sesión expirada. Por favor, inicia sesión nuevamente.')
         }
+      }
+
+      // Cargar reporte de emociones para la correlación
+      if (reporteEmocionesResponse.ok) {
+        console.log('Reporte de emociones cargado:', reporteEmocionesResponse.data)
+        console.log('Estructura de emociones_porcentaje:', reporteEmocionesResponse.data?.emociones_porcentaje)
+        console.log('Estructura de promedios_calificaciones:', reporteEmocionesResponse.data?.promedios_calificaciones)
+        setReporteEmociones(reporteEmocionesResponse.data)
+      } else {
+        console.log('Error o sin datos en reporte de emociones:', reporteEmocionesResponse)
+        // No es crítico si falla este reporte, se usarán datos por defecto
       }
 
       // Nota: El reporte de atención ahora requiere un ID específico de estudiante
@@ -130,13 +144,56 @@ export default function AdminDashboard() {
   console.log("systemStats")
   console.log(systemStats)
 
-  const emotionCorrelationData = [
-    { emotion: "Concentrado", avgScore: 87, count: 45 },
-    { emotion: "Confiado", avgScore: 92, count: 38 },
-    { emotion: "Ansioso", avgScore: 72, count: 28 },
-    { emotion: "Frustrado", avgScore: 65, count: 15 },
-    { emotion: "Neutral", avgScore: 79, count: 52 },
-  ]
+  // Función para generar datos de correlación emoción-rendimiento (escala 0-20)
+  const generateEmotionCorrelationData = () => {
+    if (reporteEmociones?.emociones_porcentaje) {
+      console.log('Procesando datos de emociones:', reporteEmociones)
+      // Convertir datos reales de emociones en formato para correlación (calificaciones sobre 20)
+      const emociones = reporteEmociones.emociones_porcentaje
+      const promedios = reporteEmociones.promedios_calificaciones
+      
+      const result = Object.entries(emociones).map(([emotion, porcentaje]) => ({
+        emotion: translateEmotion(emotion),
+        avgScore: Math.round(promedios[emotion as keyof typeof promedios] || 0),
+        count: Math.round(porcentaje), // Usar el porcentaje como indicador de frecuencia
+        percentage: Math.round(porcentaje * 100) / 100, // Porcentaje formateado
+        scoreOutOf20: true // Indicador de que es sobre 20
+      })).filter(item => item.count > 0) // Solo mostrar emociones con datos
+      
+      console.log('Datos procesados de emociones:', result)
+      return result
+    }
+    
+    console.log('Usando datos por defecto para emociones')
+    // Datos por defecto si no hay datos reales (escala sobre 20)
+    return [
+      { emotion: "Feliz", avgScore: 17, count: 45, percentage: 25.5, scoreOutOf20: true },
+      { emotion: "Neutral", avgScore: 16, count: 38, percentage: 30.2, scoreOutOf20: true },
+      { emotion: "Triste", avgScore: 13, count: 28, percentage: 20.1, scoreOutOf20: true },
+      { emotion: "Enojado", avgScore: 11, count: 15, percentage: 15.8, scoreOutOf20: true },
+      { emotion: "Miedo", avgScore: 8, count: 8, percentage: 8.4, scoreOutOf20: true },
+    ]
+  }
+
+  // Función para traducir emociones del inglés al español
+  const translateEmotion = (emotion: string): string => {
+    const translations: { [key: string]: string } = {
+      happy: "Feliz",
+      sad: "Triste", 
+      neutral: "Neutral",
+      angry: "Enojado",
+      fear: "Miedo",
+      contempt: "Desprecio",
+      disgust: "Disgusto", 
+      surprise: "Sorpresa"
+    }
+    return translations[emotion] || emotion
+  }
+
+  // Actualizar datos de correlación cuando cambien los reportes
+  useEffect(() => {
+    setEmotionCorrelationData(generateEmotionCorrelationData())
+  }, [reporteEmociones])
 
   const recentAlerts = [
     { type: "warning", message: "Estudiante Juan P. muestra ansiedad persistente", time: "Hace 15 min" },
@@ -144,6 +201,56 @@ export default function AdminDashboard() {
     { type: "error", message: "Fallo temporal en análisis facial - Resuelto", time: "Hace 2 horas" },
     { type: "success", message: "Backup de datos completado exitosamente", time: "Hace 4 horas" },
   ]
+
+  // Función auxiliar para obtener el color de cada emoción
+  const getEmotionColor = (emotion: string) => {
+    const lowerEmotion = emotion.toLowerCase()
+    switch (lowerEmotion) {
+      case "feliz":
+      case "happy":
+      case "alegre":
+      case "alegría":
+        return "bg-green-500"
+      case "triste": 
+      case "sad":
+      case "tristeza":
+        return "bg-blue-500"
+      case "neutral":
+        return "bg-gray-500"
+      case "enojado":
+      case "angry":
+      case "enojo":
+      case "ira":
+        return "bg-red-500"
+      case "miedo":
+      case "fear":
+        return "bg-yellow-500"
+      case "desprecio":
+      case "contempt":
+        return "bg-purple-500"
+      case "disgusto":
+      case "disgust":
+        return "bg-orange-500"
+      case "sorpresa":
+      case "surprise":
+      case "sorprendido":
+        return "bg-pink-500"
+      case "concentrado":
+      case "concentración":
+        return "bg-emerald-500"
+      case "confiado":
+      case "confianza":
+        return "bg-cyan-500"
+      case "ansioso":
+      case "ansiedad":
+        return "bg-amber-500"
+      case "frustrado":
+      case "frustración":
+        return "bg-rose-500"
+      default:
+        return "bg-gray-400"
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white">
@@ -277,38 +384,61 @@ export default function AdminDashboard() {
               {/* Emotion-Performance Correlation */}
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
-                    Correlación Emoción-Rendimiento
+                  <CardTitle className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
+                      Correlación Emoción-Rendimiento
+                    </div>
+                    {reporteEmociones && (
+                      <Badge variant="outline" className="text-xs">
+                        Datos en tiempo real
+                      </Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
-                    {emotionCorrelationData.map((item, index) => (
-                      <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-3">
-                          <div
-                            className={`w-3 h-3 rounded-full ${
-                              item.emotion === "Concentrado"
-                                ? "bg-green-500"
-                                : item.emotion === "Confiado"
-                                  ? "bg-blue-500"
-                                  : item.emotion === "Ansioso"
-                                    ? "bg-yellow-500"
-                                    : item.emotion === "Frustrado"
-                                      ? "bg-red-500"
-                                      : "bg-gray-500"
-                            }`}
-                          ></div>
-                          <span className="font-medium text-gray-900">{item.emotion}</span>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-gray-900">{item.avgScore}%</p>
-                          <p className="text-sm text-gray-600">{item.count} estudiantes</p>
-                        </div>
+                  {isLoadingStats ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <p className="text-sm text-gray-600">Cargando datos de emociones...</p>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {emotionCorrelationData.length > 0 ? (
+                        emotionCorrelationData.map((item, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div className={`w-3 h-3 rounded-full ${getEmotionColor(item.emotion)}`}></div>
+                              <span className="font-medium text-gray-900">{item.emotion}</span>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-semibold text-gray-900">
+                                Calificación: {item.avgScore}/20
+                              </p>
+                              <p className="text-sm text-gray-600">
+                                {(item as any).percentage ? `${(item as any).percentage}% frecuencia` : `${item.count}% detecciones`}
+                              </p>
+                            </div>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-gray-500">
+                          <Brain className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p>No hay datos de emociones disponibles</p>
+                        </div>
+                      )}
+                      {reporteEmociones && (
+                        <div className="mt-4 pt-4 border-t border-gray-200">
+                          <p className="text-xs text-gray-500">
+                            Datos de análisis de emociones basados en detección en tiempo real
+                            <span> • Total de emociones detectadas: {Object.keys(reporteEmociones.emociones_porcentaje).length}</span>
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
