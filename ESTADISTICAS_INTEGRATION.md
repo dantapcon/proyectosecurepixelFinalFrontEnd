@@ -130,7 +130,56 @@ headers: {
 3. **Mensajes específicos** para errores de autenticación
 4. **Logs detallados** para debugging de problemas de auth
 
-## Estructura de Datos Esperada
+## Estructura de Datos Actualizada
+
+### Reporte de Estadísticas Generales (ACTUALIZADO)
+
+La API ahora devuelve la siguiente estructura para el endpoint `/api/estadisticas/reporte-estadisticas-generales`:
+
+```json
+{
+  "estadisticas_globale": {
+    "n_estudiantes": 1,
+    "promedio_general": 5,
+    "n_lecciones": 0,
+    "tiempo_promedio_estudio": 5.984
+  },
+  "estadisticas_por_curso": {
+    "dsfsdf": {
+      "n_estudiantes": 1,
+      "promedio_general": 5,
+      "n_lecciones": 0,
+      "tiempo_promedio_estudio": 5.984
+    }
+  },
+  "estadisticas_por_profesor": {
+    "usuario1": {
+      "n_estudiantes": 1,
+      "promedio_general": 5,
+      "n_lecciones": 0,
+      "tiempo_promedio_estudio": 5.984
+    },
+    "davidfranciscotoro@gmail.com": {
+      "n_estudiantes": 0,
+      "promedio_general": 0,
+      "n_lecciones": 0,
+      "tiempo_promedio_estudio": 0
+    }
+  }
+}
+```
+
+**Tipos TypeScript Actualizados:**
+- `EstadisticasGlobales` - Estructura base para estadísticas
+- `EstadisticasPorEntidad` - Mapa de entidades a estadísticas
+- `ReporteEstadisticasGenerales` - Estructura completa del reporte
+
+**Visualización de Datos:**
+- Métricas principales: estudiantes, lecciones, promedio general, tiempo de estudio
+- Tabla detallada por curso con indicadores de rendimiento
+- Tabla detallada por profesor con métricas individuales
+- Progress bars para visualizar rendimiento relativo
+- Badges para clasificar promedios (bueno/malo según umbral de 10/20)
 
 ### AdminDashboardStats
 ```typescript
@@ -380,3 +429,46 @@ Se mostraría:
 - **Cards informativas**: Métricas principales destacadas
 - **Layout en grid**: Sesiones y emociones lado a lado
 - **Información contextual**: Detalles del estudiante y resumen
+
+## 🔧 **Soluciones de Hidratación Implementadas**
+
+### **Problema de Hidratación de Next.js**
+Se implementaron soluciones para prevenir errores de hidratación causados por diferencias entre el servidor y el cliente:
+
+#### **1. Hook `useClientOnly()`**
+```typescript
+// src/hooks/useClientOnly.ts
+export function useClientOnly() {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+  return mounted
+}
+```
+
+#### **2. AuthContext Protegido**
+- ✅ Acceso a `localStorage` protegido con `typeof window !== 'undefined'`
+- ✅ Estado `mounted` para controlar inicialización
+- ✅ Validación de disponibilidad de API del navegador
+
+#### **3. Componentes con Protección de Hidratación**
+- ✅ **ReporteEstadisticasPage**: Usa `useClientOnly()` 
+- ✅ **AuthProvider**: Control de montaje interno
+- ✅ **api.ts**: Todas las llamadas a `localStorage` protegidas
+
+#### **4. Patrón de Implementación**
+```typescript
+const mounted = useClientOnly()
+
+if (!mounted) {
+  return <LoadingComponent />
+}
+
+// Renderizar contenido normal
+```
+
+### **Errores Corregidos**
+- ❌ `localStorage` accedido en servidor
+- ❌ Diferencias en atributos HTML servidor/cliente  
+- ❌ Estados iniciales inconsistentes
+- ✅ Hidratación sin errores
+- ✅ Funcionalidad completa en cliente

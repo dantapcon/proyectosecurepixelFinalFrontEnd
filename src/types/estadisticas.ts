@@ -9,13 +9,21 @@ export interface AdminDashboardStats {
   n_cursos: string // Se usa como tiempo de respuesta de IA
 }
 
+export interface EstadisticasGlobales {
+  n_estudiantes: number
+  promedio_general: number
+  n_lecciones: number
+  tiempo_promedio_estudio: number
+}
+
+export interface EstadisticasPorEntidad {
+  [key: string]: EstadisticasGlobales
+}
+
 export interface ReporteEstadisticasGenerales {
-  total_usuarios: number
-  total_cursos: number
-  total_evaluaciones: number
-  promedio_calificaciones: number
-  estudiantes_activos_ultimo_mes: number
-  profesores_activos: number
+  estadisticas_globale: EstadisticasGlobales
+  estadisticas_por_curso: EstadisticasPorEntidad
+  estadisticas_por_profesor: EstadisticasPorEntidad
 }
 
 export interface ReporteAtencionEstudiantes {

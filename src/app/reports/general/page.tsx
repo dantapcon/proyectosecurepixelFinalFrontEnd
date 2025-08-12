@@ -22,15 +22,19 @@ import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
 import { estadisticasAPI, isAuthenticated } from "@/lib/api"
 import type { ReporteEstadisticasGenerales } from "@/types/estadisticas"
+import { useClientOnly } from "@/hooks/useClientOnly"
 
 export default function ReporteEstadisticasPage() {
   const [reporteGeneral, setReporteGeneral] = useState<ReporteEstadisticasGenerales | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
+  const mounted = useClientOnly()
   const { user } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
+    if (!mounted) return
+    
     if (!user) {
       router.push('/login')
       return
@@ -43,7 +47,7 @@ export default function ReporteEstadisticasPage() {
     }
     
     loadReporteGeneral()
-  }, [user, router])
+  }, [user, router, mounted])
 
   const loadReporteGeneral = async () => {
     setIsLoading(true)
@@ -79,6 +83,18 @@ export default function ReporteEstadisticasPage() {
   const handleDownloadReport = () => {
     // Implementar descarga del reporte en PDF/Excel
     console.log('Descargando reporte...')
+  }
+
+  // Prevenir problemas de hidratación
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Inicializando...</p>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -148,9 +164,9 @@ export default function ReporteEstadisticasPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total de Usuarios</p>
+                      <p className="text-sm text-gray-600">Total de Estudiantes</p>
                       <p className="text-3xl font-bold text-blue-600">
-                        {reporteGeneral.total_usuarios.toLocaleString()}
+                        {(reporteGeneral?.estadisticas_globale?.n_estudiantes ?? 0).toLocaleString()}
                       </p>
                     </div>
                     <Users className="h-8 w-8 text-blue-600" />
@@ -162,9 +178,9 @@ export default function ReporteEstadisticasPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total de Cursos</p>
+                      <p className="text-sm text-gray-600">Total de Lecciones</p>
                       <p className="text-3xl font-bold text-green-600">
-                        {reporteGeneral.total_cursos}
+                        {reporteGeneral?.estadisticas_globale?.n_lecciones ?? 0}
                       </p>
                     </div>
                     <BookOpen className="h-8 w-8 text-green-600" />
@@ -176,9 +192,9 @@ export default function ReporteEstadisticasPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Total de Evaluaciones</p>
+                      <p className="text-sm text-gray-600">Promedio General</p>
                       <p className="text-3xl font-bold text-purple-600">
-                        {reporteGeneral.total_evaluaciones.toLocaleString()}
+                        {(reporteGeneral?.estadisticas_globale?.promedio_general ?? 0).toFixed(1)}
                       </p>
                     </div>
                     <BarChart3 className="h-8 w-8 text-purple-600" />
@@ -190,9 +206,9 @@ export default function ReporteEstadisticasPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Promedio de Calificaciones</p>
+                      <p className="text-sm text-gray-600">Tiempo Promedio de Estudio</p>
                       <p className="text-3xl font-bold text-orange-600">
-                        {reporteGeneral.promedio_calificaciones.toFixed(1)}%
+                        {(reporteGeneral?.estadisticas_globale?.tiempo_promedio_estudio ?? 0).toFixed(1)} min
                       </p>
                     </div>
                     <Award className="h-8 w-8 text-orange-600" />
@@ -204,9 +220,9 @@ export default function ReporteEstadisticasPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Estudiantes Activos (Último Mes)</p>
+                      <p className="text-sm text-gray-600">Profesores Activos</p>
                       <p className="text-3xl font-bold text-indigo-600">
-                        {reporteGeneral.estudiantes_activos_ultimo_mes}
+                        {reporteGeneral?.estadisticas_por_profesor ? Object.keys(reporteGeneral.estadisticas_por_profesor).length : 0}
                       </p>
                     </div>
                     <TrendingUp className="h-8 w-8 text-indigo-600" />
@@ -218,9 +234,9 @@ export default function ReporteEstadisticasPage() {
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-gray-600">Profesores Activos</p>
+                      <p className="text-sm text-gray-600">Cursos Disponibles</p>
                       <p className="text-3xl font-bold text-teal-600">
-                        {reporteGeneral.profesores_activos}
+                        {reporteGeneral?.estadisticas_por_curso ? Object.keys(reporteGeneral.estadisticas_por_curso).length : 0}
                       </p>
                     </div>
                     <Clock className="h-8 w-8 text-teal-600" />
@@ -239,45 +255,48 @@ export default function ReporteEstadisticasPage() {
                   <div className="space-y-4">
                     <div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-sm text-gray-600">Tasa de Participación Estudiantil</span>
+                        <span className="text-sm text-gray-600">Promedio General del Sistema</span>
                         <span className="text-sm font-medium">
-                          {reporteGeneral.total_usuarios > 0 
-                            ? ((reporteGeneral.estudiantes_activos_ultimo_mes / reporteGeneral.total_usuarios) * 100).toFixed(1)
-                            : 0}%
+                          {(reporteGeneral?.estadisticas_globale?.promedio_general ?? 0).toFixed(1)}/20
                         </span>
                       </div>
                       <Progress 
-                        value={reporteGeneral.total_usuarios > 0 
-                          ? (reporteGeneral.estudiantes_activos_ultimo_mes / reporteGeneral.total_usuarios) * 100
-                          : 0} 
+                        value={((reporteGeneral?.estadisticas_globale?.promedio_general ?? 0) / 20) * 100} 
                         className="h-2" 
                       />
                     </div>
                     
                     <div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-sm text-gray-600">Rendimiento Académico Promedio</span>
-                        <span className="text-sm font-medium">{reporteGeneral.promedio_calificaciones.toFixed(1)}%</span>
+                        <span className="text-sm text-gray-600">Tiempo Promedio de Estudio</span>
+                        <span className="text-sm font-medium">{(reporteGeneral?.estadisticas_globale?.tiempo_promedio_estudio ?? 0).toFixed(1)} min</span>
                       </div>
-                      <Progress value={reporteGeneral.promedio_calificaciones} className="h-2" />
+                      <Progress 
+                        value={Math.min(((reporteGeneral?.estadisticas_globale?.tiempo_promedio_estudio ?? 0) / 60) * 100, 100)} 
+                        className="h-2" 
+                      />
                     </div>
 
                     <div>
                       <div className="flex justify-between mb-2">
-                        <span className="text-sm text-gray-600">Evaluaciones por Usuario</span>
+                        <span className="text-sm text-gray-600">Estudiantes por Profesor</span>
                         <span className="text-sm font-medium">
-                          {reporteGeneral.total_usuarios > 0 
-                            ? (reporteGeneral.total_evaluaciones / reporteGeneral.total_usuarios).toFixed(1)
-                            : 0}
+                          {reporteGeneral?.estadisticas_por_profesor 
+                            ? (
+                                (reporteGeneral?.estadisticas_globale?.n_estudiantes ?? 0) / 
+                                Math.max(Object.keys(reporteGeneral.estadisticas_por_profesor).length, 1)
+                              ).toFixed(1)
+                            : '0'}
                         </span>
                       </div>
                       <Progress 
-                        value={Math.min(
-                          reporteGeneral.total_usuarios > 0 
-                            ? (reporteGeneral.total_evaluaciones / reporteGeneral.total_usuarios) * 10
-                            : 0, 
-                          100
-                        )} 
+                        value={reporteGeneral?.estadisticas_por_profesor 
+                          ? Math.min(
+                              ((reporteGeneral?.estadisticas_globale?.n_estudiantes ?? 0) / 
+                               Math.max(Object.keys(reporteGeneral.estadisticas_por_profesor).length, 1)) * 5, 
+                              100
+                            )
+                          : 0} 
                         className="h-2" 
                       />
                     </div>
@@ -293,41 +312,119 @@ export default function ReporteEstadisticasPage() {
                   <div className="space-y-4">
                     <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                       <div>
-                        <p className="text-sm font-medium text-blue-800">Ratio Profesor/Estudiante</p>
-                        <p className="text-xs text-blue-600">Distribución de usuarios en el sistema</p>
+                        <p className="text-sm font-medium text-blue-800">Total de Estudiantes</p>
+                        <p className="text-xs text-blue-600">Estudiantes registrados en el sistema</p>
                       </div>
                       <p className="text-lg font-bold text-blue-600">
-                        1:{reporteGeneral.profesores_activos > 0 
-                          ? Math.round((reporteGeneral.total_usuarios - reporteGeneral.profesores_activos) / reporteGeneral.profesores_activos)
-                          : 0}
+                        {(reporteGeneral?.estadisticas_globale?.n_estudiantes ?? 0).toLocaleString()}
                       </p>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
                       <div>
-                        <p className="text-sm font-medium text-green-800">Cursos por Profesor</p>
-                        <p className="text-xs text-green-600">Carga promedio de trabajo</p>
+                        <p className="text-sm font-medium text-green-800">Lecciones Disponibles</p>
+                        <p className="text-xs text-green-600">Total de lecciones en el sistema</p>
                       </div>
                       <p className="text-lg font-bold text-green-600">
-                        {reporteGeneral.profesores_activos > 0 
-                          ? (reporteGeneral.total_cursos / reporteGeneral.profesores_activos).toFixed(1)
-                          : 0}
+                        {reporteGeneral?.estadisticas_globale?.n_lecciones ?? 0}
                       </p>
                     </div>
 
                     <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
                       <div>
-                        <p className="text-sm font-medium text-purple-800">Evaluaciones Completadas</p>
-                        <p className="text-xs text-purple-600">Total en el sistema</p>
+                        <p className="text-sm font-medium text-purple-800">Cursos Activos</p>
+                        <p className="text-xs text-purple-600">Cursos con estudiantes inscritos</p>
                       </div>
                       <p className="text-lg font-bold text-purple-600">
-                        {reporteGeneral.total_evaluaciones.toLocaleString()}
+                        {reporteGeneral?.estadisticas_por_curso ? Object.keys(reporteGeneral.estadisticas_por_curso).length : 0}
                       </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
             </div>
+
+            {/* Estadísticas por Curso */}
+            {reporteGeneral?.estadisticas_por_curso && Object.keys(reporteGeneral.estadisticas_por_curso).length > 0 && (
+              <div className="mt-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Estadísticas por Curso</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-2">Curso</th>
+                            <th className="text-center p-2">Estudiantes</th>
+                            <th className="text-center p-2">Promedio</th>
+                            <th className="text-center p-2">Lecciones</th>
+                            <th className="text-center p-2">Tiempo Promedio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(reporteGeneral.estadisticas_por_curso).map(([nombreCurso, stats]) => (
+                            <tr key={nombreCurso} className="border-b hover:bg-gray-50">
+                              <td className="p-2 font-medium">{nombreCurso}</td>
+                              <td className="p-2 text-center">{stats.n_estudiantes}</td>
+                              <td className="p-2 text-center">
+                                <Badge variant={stats.promedio_general >= 10 ? "default" : "destructive"}>
+                                  {stats.promedio_general.toFixed(1)}/20
+                                </Badge>
+                              </td>
+                              <td className="p-2 text-center">{stats.n_lecciones}</td>
+                              <td className="p-2 text-center">{stats.tiempo_promedio_estudio.toFixed(1)} min</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* Estadísticas por Profesor */}
+            {reporteGeneral?.estadisticas_por_profesor && Object.keys(reporteGeneral.estadisticas_por_profesor).length > 0 && (
+              <div className="mt-8">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Estadísticas por Profesor</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-2">Profesor</th>
+                            <th className="text-center p-2">Estudiantes</th>
+                            <th className="text-center p-2">Promedio</th>
+                            <th className="text-center p-2">Lecciones</th>
+                            <th className="text-center p-2">Tiempo Promedio</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(reporteGeneral.estadisticas_por_profesor).map(([nombreProfesor, stats]) => (
+                            <tr key={nombreProfesor} className="border-b hover:bg-gray-50">
+                              <td className="p-2 font-medium">{nombreProfesor}</td>
+                              <td className="p-2 text-center">{stats.n_estudiantes}</td>
+                              <td className="p-2 text-center">
+                                <Badge variant={stats.promedio_general >= 10 ? "default" : "destructive"}>
+                                  {stats.promedio_general.toFixed(1)}/20
+                                </Badge>
+                              </td>
+                              <td className="p-2 text-center">{stats.n_lecciones}</td>
+                              <td className="p-2 text-center">{stats.tiempo_promedio_estudio.toFixed(1)} min</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </>
         )}
       </div>

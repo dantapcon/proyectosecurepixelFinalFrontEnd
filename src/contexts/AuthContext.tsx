@@ -35,30 +35,41 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined)
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     // Verificar si hay un usuario autenticado al cargar la app
     const checkAuth = async () => {
-      const token = localStorage.getItem('token')
+      if (!mounted) return
+      
+      const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
       if (token) {
         try {
           const response = await userAPI.getCurrentUser()
           if (response.ok) {
             setUser(response.data)
           } else {
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('token')
+              localStorage.removeItem('user')
+            }
+          }
+        } catch (error) {
+          if (typeof window !== 'undefined') {
             localStorage.removeItem('token')
             localStorage.removeItem('user')
           }
-        } catch (error) {
-          localStorage.removeItem('token')
-          localStorage.removeItem('user')
         }
       }
       setIsLoading(false)
     }
 
     checkAuth()
-  }, [])
+  }, [mounted])
 
   const login = async (username: string, password: string): Promise<{ success: boolean; user?: User }> => {
     try {
@@ -66,18 +77,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       if (response.ok) {
         // Primero guardamos el token
-        localStorage.setItem('token', response.data.token)
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('token', response.data.token)
+        }
         
         // Luego obtenemos la información completa del usuario
         const userResponse = await userAPI.getCurrentUser()
         
         if (userResponse.ok) {
           setUser(userResponse.data)
-          localStorage.setItem('user', JSON.stringify(userResponse.data))
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('user', JSON.stringify(userResponse.data))
+          }
           return { success: true, user: userResponse.data }
         } else {
           // Si falla obtener el usuario, limpiamos el token
-          localStorage.removeItem('token')
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('token')
+          }
           return { success: false }
         }
       }
@@ -120,8 +137,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       console.log('Cleaning up local session...')
       setUser(null)
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+      }
     }
   }
 

@@ -160,7 +160,7 @@ export const userAPI = {
   },
 
   logout: async () => {
-    const token = localStorage.getItem('token')
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
     console.log('Attempting logout with token:', token ? 'Token found' : 'No token found')
     
     // Intentar con diferentes formatos de autenticación
