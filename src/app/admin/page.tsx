@@ -418,7 +418,7 @@ export default function AdminDashboard() {
                                 Calificación: {item.avgScore}/20
                               </p>
                               <p className="text-sm text-gray-600">
-                                {(item as any).percentage ? `${(item as any).percentage}% frecuencia` : `${item.count}% detecciones`}
+                                {`${item.count} detecciones, promedio: ${item.avgScore.toFixed(1)}`}
                               </p>
                             </div>
                           </div>

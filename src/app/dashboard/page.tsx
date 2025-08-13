@@ -10,6 +10,7 @@ import { Shield, BookOpen, Brain, Camera, TrendingUp, Clock, Award, Target, User
 import Link from "next/link"
 import { useAuth } from "@/contexts/AuthContext"
 import { apiRequest, API_ENDPOINTS, topicAPI, courseAPI, estadisticasAPI, isAuthenticated } from "@/lib/api"
+import type { ReporteEmocionesEstudiante } from "@/types/estadisticas"
 
 // Interfaces para los datos
 interface Course {
@@ -34,7 +35,7 @@ export default function DashboardPage() {
   const [courseTopics, setCourseTopics] = useState<Topic[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState("")
-  const [studentEmotionStats, setStudentEmotionStats] = useState<any>(null)
+  const [studentEmotionStats, setStudentEmotionStats] = useState<ReporteEmocionesEstudiante | null>(null)
   const [isLoadingEmotionStats, setIsLoadingEmotionStats] = useState(false)
   const { logout, user } = useAuth()
   const router = useRouter()
@@ -435,23 +436,23 @@ export default function DashboardPage() {
                   ) : studentEmotionStats ? (
                     <div className="space-y-4">
                       <div className="text-sm text-gray-600 mb-3">
-                        Sesiones analizadas: {studentEmotionStats.sesiones_analizadas || 0}
+                        Análisis de emociones disponible
                       </div>
-                      {studentEmotionStats.emociones_detectadas && studentEmotionStats.emociones_detectadas.length > 0 ? (
+                      {studentEmotionStats.emociones_porcentaje ? (
                         <div className="space-y-3">
-                          {studentEmotionStats.emociones_detectadas.slice(0, 3).map((emocion: any, index: number) => (
+                          {Object.entries(studentEmotionStats.emociones_porcentaje).slice(0, 3).map(([emotion, percentage], index) => (
                             <div key={index} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                               <div>
                                 <p className="text-sm font-medium text-blue-800 capitalize">
-                                  {emocion.emocion}
+                                  {emotion}
                                 </p>
                                 <p className="text-xs text-blue-600">
-                                  {emocion.cantidad} detecciones
+                                  {percentage.toFixed(1)}% del tiempo
                                 </p>
                               </div>
                               <div className="text-right">
                                 <p className="text-lg font-bold text-blue-600">
-                                  {emocion.porcentaje.toFixed(1)}%
+                                  Promedio: {studentEmotionStats.promedios_calificaciones[emotion as keyof typeof studentEmotionStats.promedios_calificaciones]?.toFixed(1) || 'N/A'}
                                 </p>
                               </div>
                             </div>

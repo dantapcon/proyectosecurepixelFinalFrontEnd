@@ -4,6 +4,10 @@ import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react
 import { FaceLandmarker, FilesetResolver} from '@mediapipe/tasks-vision';
 import { emotionAPI } from '@/lib/api';
 
+export interface EmotionTrackerHandle {
+  enviarAtencion: () => void;
+}
+
 interface EmotionTrackerProps {
   active: boolean;
   topicId: number;
@@ -12,7 +16,7 @@ interface EmotionTrackerProps {
   onEmotionChange?: (emotion: string) => void;
 }
 
-const EmotionTracker = forwardRef(function EmotionTracker({
+const EmotionTracker = forwardRef<EmotionTrackerHandle, EmotionTrackerProps>(function EmotionTracker({
   active,
   topicId,
   userId,

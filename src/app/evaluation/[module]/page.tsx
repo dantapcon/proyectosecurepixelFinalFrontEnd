@@ -531,7 +531,7 @@ export default function EvaluationPage() {
               <CardHeader>
                 <CardTitle className="text-2xl">Evaluación</CardTitle>
                 <p className="text-gray-600">
-                  Responde todas las preguntas y haz clic en "Enviar Evaluación" al finalizar.
+                  Responde todas las preguntas y haz clic en &quot;Enviar Evaluación&quot; al finalizar.
                 </p>
               </CardHeader>
               <CardContent className="space-y-8">

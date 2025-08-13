@@ -241,7 +241,14 @@ export default function AdminSettingsPage() {
       console.log('Guardando usuario:', editingUser.id, editForm)
       
       // Preparar los datos para enviar
-      const updateData: any = {
+      const updateData: {
+        username: string;
+        email: string;
+        first_name: string;
+        last_name: string;
+        tipo_usuario: string;
+        curso?: number;
+      } = {
         username: editForm.username,
         email: editForm.email,
         first_name: editForm.first_name,

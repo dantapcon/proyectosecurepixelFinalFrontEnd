@@ -1,7 +1,7 @@
 "use client"
 
 import Link from "next/link"
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,7 +11,7 @@ import { Shield } from "lucide-react"
 import { useAuth } from "@/contexts/AuthContext"
 import { getRedirectPath } from "@/lib/api"
 
-export default function LoginPage() {
+function LoginForm() {
   const [formData, setFormData] = useState({
     username: '',
     password: ''
@@ -181,5 +181,37 @@ export default function LoginPage() {
         © 2023 SecurePixel - Sistema de Aprendizaje Inteligente de Ciberseguridad
       </footer>
     </div>
+  )
+}
+
+function LoginPageSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <div className="flex items-center justify-center mb-4">
+            <Shield className="h-10 w-10 text-blue-600 animate-pulse" />
+          </div>
+          <CardTitle className="text-2xl text-center">Cargando...</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+            <div className="h-10 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginPageSkeleton />}>
+      <LoginForm />
+    </Suspense>
   )
 }

@@ -665,7 +665,7 @@ export default function AdminCoursesPage() {
                         </select>
                         {teachers.length === 0 && (
                           <p className="mt-1 text-sm text-amber-600">
-                            ⚠️ No se encontraron profesores. Verifique que existan usuarios con tipo "profesor".
+                            ⚠️ No se encontraron profesores. Verifique que existan usuarios con tipo &quot;profesor&quot;.
                           </p>
                         )}
                       </div>

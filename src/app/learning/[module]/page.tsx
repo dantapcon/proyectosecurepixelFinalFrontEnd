@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { topicAPI, pruebaAPI } from "@/lib/api";
-import EmotionTracker from "@/components/EmotionTracker";
+import EmotionTracker, { EmotionTrackerHandle } from "@/components/EmotionTracker";
 import { useAuth } from "@/contexts/AuthContext"
 interface Topic {
   id: number;
@@ -43,7 +43,7 @@ export default function LearningModulePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const user  = useAuth()
+  const { user } = useAuth();
   // Cargar el tema cuando se monta el componente
   useEffect(() => {
     const loadTopic = async () => {
@@ -161,7 +161,7 @@ export default function LearningModulePage() {
       router.push("/dashboard");
     }, 100);
   };
-  const emotionTrackerRef = useRef(null);
+  const emotionTrackerRef = useRef<EmotionTrackerHandle>(null);
   // Manejo para ir a evaluación, crea prueba y redirige
   const handleGoToEvaluation = async () => {
     stopCamera();
@@ -286,7 +286,7 @@ export default function LearningModulePage() {
                           ref={emotionTrackerRef}  
                           active={cameraEnabled}
                           topicId={topic.id}
-                          userId={user.user.id} // Cambiar según contexto real fcvbfcb gvbfcgvbfcfcgv
+                          userId={user?.id || 0} // ID del usuario actual
                           tiempoLectura={tiempoLectura}
                           onEmotionChange={(emotion) => setEmotionalState(emotion)}
                         />
