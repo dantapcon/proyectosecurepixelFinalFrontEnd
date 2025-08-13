@@ -536,3 +536,57 @@ export interface ProfesorDashboardStats {
 - Reemplazadas métricas obsoletas (`tiempo_promedio`, `estudiantes_en_riesgo`) por nuevas métricas relevantes
 - Agregada nueva carta para mostrar total de cursos
 - Mantiene compatibilidad con valores por defecto en caso de datos faltantes
+
+## Refactorización de EmotionTracker API (NUEVO)
+
+**MEJORA IMPLEMENTADA:** Se refactorizó la función de análisis de atención del componente `EmotionTracker` para seguir el patrón estándar de las demás APIs.
+
+### Cambios Realizados:
+
+#### 1. **API Centralizada** (`src/lib/api.ts`)
+- **Función actualizada:** `emotionAPI.analyzeAttention()`
+- **Autenticación:** Incluye validación de token y headers de autorización
+- **Manejo de errores:** Consistente con el patrón de otras APIs
+- **Logging:** Logs detallados para debugging
+
+```typescript
+analyzeAttention: async (data: any) => {
+  // Validación de token
+  // Headers de autorización
+  // Manejo robusto de errores
+  // Logging consistente
+}
+```
+
+#### 2. **Componente EmotionTracker** (`src/components/EmotionTracker.tsx`)
+- **Importación:** Agregada importación de `emotionAPI`
+- **Eliminado:** Fetch directo con URL hardcodeada
+- **Reemplazado:** Por llamada a `emotionAPI.analyzeAttention()`
+- **Beneficios:** 
+  - Autenticación automática
+  - Manejo de errores centralizado
+  - Consistencia con el resto del sistema
+
+### Antes vs Después:
+
+**Antes (fetch directo):**
+```typescript
+const response = await fetch("http://localhost:8000/api/ia/atencion", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify(datos),
+});
+```
+
+**Después (API centralizada):**
+```typescript
+const response = await emotionAPI.analyzeAttention(datos);
+```
+
+### Ventajas de la Refactorización:
+- ✅ **Autenticación automática** con token
+- ✅ **Manejo de errores** estandarizado
+- ✅ **URL centralizada** (no hardcodeada)
+- ✅ **Logging consistente** para debugging
+- ✅ **Mantenibilidad** mejorada
+- ✅ **Reutilizable** desde otros componentes

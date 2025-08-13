@@ -344,12 +344,31 @@ export const emotionAPI = {
     })
   },
 
-  // Análisis de atención (para futuras implementaciones)
+  // Análisis de atención
   analyzeAttention: async (data: any) => {
-    return apiRequest(API_ENDPOINTS.ATENCION, {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null
+    if (!token) {
+      console.error('No token found for attention analysis request')
+      return {
+        ok: false,
+        status: 401,
+        data: { message: 'Token de autenticación requerido' }
+      }
+    }
+    
+    console.log('📊 Enviando datos de atención:', data)
+    
+    const response = await apiRequest(API_ENDPOINTS.ATENCION, {
       method: 'POST',
+      headers: {
+        'Authorization': `Token ${token}`,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(data),
     })
+    
+    console.log('✅ Respuesta de análisis de atención:', response)
+    return response
   },
 }
 

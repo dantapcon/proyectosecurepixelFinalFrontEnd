@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { FaceLandmarker, FilesetResolver} from '@mediapipe/tasks-vision';
+import { emotionAPI } from '@/lib/api';
 
 interface EmotionTrackerProps {
   active: boolean;
@@ -232,19 +233,13 @@ const EmotionTracker = forwardRef(function EmotionTracker({
       console.log("Total parpadeos:", vectorOjosCerradosRef.current.length);
       console.log("Tiempo total:", tiempoFinal, "segundos");
 
-      const response = await fetch("http://localhost:8000/api/ia/atencion", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(datos),
-      });
+      const response = await emotionAPI.analyzeAttention(datos);
 
-      if (!response.ok) {
+      if (response.ok) {
+        console.log("✅ Datos enviados correctamente");
+      } else {
         throw new Error(`Error en la petición: ${response.status}`);
       }
-
-      console.log("✅ Datos enviados correctamente");
     } catch (err) {
       console.error("❌ Error enviando atención:", err);
     }
